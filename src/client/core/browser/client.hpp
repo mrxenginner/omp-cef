@@ -7,6 +7,7 @@
 class BrowserManager;
 class AudioManager;
 class FocusManager;
+class NetworkManager;
 
 class BrowserClient : public CefClient,
     public CefLifeSpanHandler,
@@ -19,8 +20,8 @@ class BrowserClient : public CefClient,
  {
 
 public:
-    static CefRefPtr<BrowserClient> Create(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus);
-    BrowserClient(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus);
+    static CefRefPtr<BrowserClient> Create(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus, NetworkManager& network);
+    BrowserClient(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus, NetworkManager& network);
 
     // CefClient overrides
     CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; };
@@ -82,6 +83,7 @@ private:
     BrowserManager& manager_;
     AudioManager& audio_;
     FocusManager* focus_{};
+    NetworkManager& network_;
 
     // Audio parameters cached from stream start
     int sample_rate_ = 44100;

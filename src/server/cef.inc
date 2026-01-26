@@ -125,9 +125,10 @@ native CEF_DestroyBrowser(playerid, browserid);
  * This function defines the expected argument types for the event.
  *
  * @param eventName         The name of the event to register.
+ * @param callback          The name of the event callback.
  * @param ...               A variadic list of argument types (e.g., Argument_String, Argument_Integer ...).
  */
-native CEF_RegisterEvent(const eventName[], E_CEF_ARGUMENT_TYPE:...);
+native CEF_RegisterEvent(const eventName[], const callback[], E_CEF_ARGUMENT_TYPE:...);
 
 /**
  * Emits an event from Pawn to a specific CEF browser instance (JavaScript).

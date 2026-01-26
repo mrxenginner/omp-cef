@@ -114,26 +114,6 @@ void CefPlugin::Shutdown()
 void CefPlugin::OnPlayerConnect(int playerid)
 {
 	sessions_->RegisterPlayer(playerid);
-
-	/*auto session = sessions_->GetSession(playerid);
-	if (session && session->handshake_complete) {
-		LOG_INFO("[SERVER] Player %d connected, CEF handshake complete.", playerid);
-		return;
-	}*/
-
-	/*auto timer = std::make_shared<asio::steady_timer>(io_context_);
-    timer->expires_after(std::chrono::seconds(10));
-
-    timer->async_wait([this, playerid, timer](const std::error_code& error_code) {
-        if (error_code || !running_) return;
-
-        auto session = sessions_->GetSession(playerid);
-        if (!session) return;
-
-        if (!session->handshake_complete) {
-            EnqueueCefInitialize(playerid, false);
-        }
-    });*/
 }
 
 void CefPlugin::OnPlayerClientInit(int playerid)
@@ -535,6 +515,73 @@ void CefPlugin::HandleClientEvent(int playerid, const ClientEmitEventPacket& pay
 
 		return;
 	}
+
+    auto it = registered_events_.find(payload.name);
+    if (it == registered_events_.end())
+        return;
+
+    const auto& reg = it->second;
+    const auto& signature = reg.signature;
+
+    if (signature.size() != payload.args.size())
+    {
+        LOG_WARN("Argument count mismatch for event '%s' (callback '%s'). Expected %zu, got %zu.",
+            payload.name.c_str(), reg.callback.c_str(), signature.size(), payload.args.size());
+        return;
+    }
+
+    for (size_t i = 0; i < payload.args.size(); ++i)
+    {
+        const auto& arg = payload.args[i];
+        const auto expected = signature[i];
+
+        if (arg.type != expected)
+        {
+            LOG_WARN("Type mismatch for event '%s' (callback '%s') at arg %zu. Expected %d, got %d.",
+                payload.name.c_str(), reg.callback.c_str(), i,
+                static_cast<int>(expected), static_cast<int>(arg.type));
+            return;
+        }
+    }
+
+    std::vector<Argument> final_args;
+    final_args.reserve(2 + payload.args.size());
+    final_args.emplace_back(playerid);
+    final_args.emplace_back(payload.browserId);
+    final_args.insert(final_args.end(), payload.args.begin(), payload.args.end());
+
+    bridge_->CallPawnPublic(reg.callback, final_args);
+}
+
+void CefPlugin::RegisterEvent(const std::string& name, const std::string& callback, const std::vector<ArgumentType>& signature)
+{
+	for (size_t i = 0; i < signature.size(); ++i)
+	{
+		const auto& type = signature[i];
+		const char* typeName = "Unknown";
+
+		switch (type)
+		{
+			case ArgumentType::String:
+				typeName = "String";
+				break;
+			case ArgumentType::Integer:
+				typeName = "Integer";
+				break;
+			case ArgumentType::Float:
+				typeName = "Float";
+				break;
+			case ArgumentType::Bool:
+				typeName = "Bool";
+				break;
+		}
+	}
+
+	RegisteredEvent event;
+    event.callback = callback.empty() ? name : callback;
+    event.signature = signature;
+
+    registered_events_[name] = std::move(event);
 }
 
 CefPlugin::~CefPlugin()

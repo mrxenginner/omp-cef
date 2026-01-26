@@ -22,7 +22,7 @@ public:
     void CreateBrowser(int playerid, int browserid, const std::string& url, bool focused, bool controls_chat);
     void CreateWorldBrowser(int playerid, int browserid, const std::string& url, const std::string& textureName, float width, float height);
     void DestroyBrowser(int playerid, int browserid);
-    void RegisterEvent(const std::string& name, const std::vector<ArgumentType>& signature);
+    void RegisterEvent(const std::string& name, const std::string& callback, const std::vector<ArgumentType>& signature);
     void EmitEvent(int playerid, int browserid, const std::string& name, const std::vector<Argument>& args);
 
     void AttachBrowserToObject(int playerid, int browserid, int objectid);
@@ -32,4 +32,6 @@ private:
     CefPlugin& plugin_;
 
     static CefApi* instance_;
+
+    // std::unordered_map<std::string, std::vector<ArgumentType>> registered_events_;
 };

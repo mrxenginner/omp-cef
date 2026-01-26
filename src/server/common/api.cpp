@@ -66,9 +66,9 @@ void CefApi::DestroyBrowser(int playerid, int browserid)
 	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
 }
 
-void CefApi::RegisterEvent(const std::string& name, const std::vector<ArgumentType>& signature) 
+void CefApi::RegisterEvent(const std::string& name, const std::string& callback, const std::vector<ArgumentType>& signature) 
 {
-	// TODO
+	plugin_.RegisterEvent(name, callback, signature);
 }
 
 void CefApi::EmitEvent(int playerid, int browserid, const std::string& name, const std::vector<Argument>& args)

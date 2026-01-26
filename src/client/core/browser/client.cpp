@@ -5,14 +5,15 @@
 #include "browser/audio.hpp"
 #include "browser/focus.hpp"
 #include "browser/manager.hpp"
+#include "network/network_manager.hpp"
 
-CefRefPtr<BrowserClient> BrowserClient::Create(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus)
+CefRefPtr<BrowserClient> BrowserClient::Create(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus, NetworkManager& network)
 {
-    return new BrowserClient(id, mgr, audio, focus);
+    return new BrowserClient(id, mgr, audio, focus, network);
 }
 
-BrowserClient::BrowserClient(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus)
-    : browserId_(id), manager_(mgr), audio_(audio), focus_(focus)
+BrowserClient::BrowserClient(int id, BrowserManager& mgr, AudioManager& audio, FocusManager* focus, NetworkManager& network)
+	: browserId_(id), manager_(mgr), audio_(audio), focus_(focus), network_(network)
 {
 }
 
@@ -93,8 +94,27 @@ bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> /*browser*/,
             }
             return true;
         }
+
+        ClientEmitEventPacket event_packet;
+        event_packet.browserId = browserId_;
+        event_packet.name = event_name;
+
+        for (size_t i = 1; i < args->GetSize(); ++i) {
+            CefValueType type = args->GetType(i);
+            if (type == VTYPE_BOOL)
+                event_packet.args.emplace_back(args->GetBool(i));
+            else if (type == VTYPE_INT)   
+                event_packet.args.emplace_back(args->GetInt(i));
+            else if (type == VTYPE_DOUBLE)
+                event_packet.args.emplace_back(static_cast<float>(args->GetDouble(i)));
+            else if (type == VTYPE_STRING)
+                event_packet.args.emplace_back(args->GetString(i).ToString());
+        }
+
+		network_.SendPacket(PacketType::ClientEmitEvent, event_packet);
         return true;
     }
+
     return false;
 }
 

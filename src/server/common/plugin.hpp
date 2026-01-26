@@ -13,6 +13,12 @@
 #include "security.hpp"
 #include "session.hpp"
 
+struct RegisteredEvent
+{
+    std::string callback;
+    std::vector<ArgumentType> signature;
+};
+
 class CefPlugin
 {
 public:
@@ -42,6 +48,7 @@ public:
 
 	void NotifyCefInitialize(std::shared_ptr<NetworkSession> session, bool ok);
 	void HandleClientEvent(int playerid, const ClientEmitEventPacket& payload);
+	void RegisterEvent(const std::string& name, const std::string& callback, const std::vector<ArgumentType>& signature);
 
 	ResourceManager& GetResourceManager()
 	{
@@ -77,4 +84,6 @@ private:
 	std::unique_ptr<NetworkServer> network_server_;
 	std::thread network_thread_;
 	std::atomic<bool> running_{ false };
+
+	std::unordered_map<std::string, RegisteredEvent> registered_events_;
 };

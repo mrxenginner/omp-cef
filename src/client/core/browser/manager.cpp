@@ -185,7 +185,7 @@ void BrowserManager::CreateBrowserInternal(
     auto instance = std::make_unique<BrowserInstance>(id);
     instance->mode = RenderMode::Overlay2D;
     instance->url = url;
-    instance->client = BrowserClient::Create(id, *this, audio_, focus_);
+    instance->client = BrowserClient::Create(id, *this, audio_, focus_, network_);
     instance->controls_chat_input = controls_chat;
 
     if (auto* device = RenderManager::Instance().GetDevice())
@@ -253,7 +253,7 @@ void BrowserManager::CreateWorldBrowserInternal(
     instance->mode = RenderMode::WorldObject3D;
     instance->url = url;
     instance->textureName = textureName;
-    instance->client = BrowserClient::Create(id, *this, audio_, focus_);
+    instance->client = BrowserClient::Create(id, *this, audio_, focus_, network_);
 
     const int browser_width = std::clamp((int)width, 1, 1024);
     const int browser_height = std::clamp((int)height, 1, 1024);
