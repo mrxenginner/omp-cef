@@ -581,17 +581,34 @@ void BrowserManager::UpdateAudioSpatialization()
     }
 }
 
+void BrowserInstance::OpenDevTools()
+{
+    if (!browser)
+    {
+        LOG_WARN("[CEF] OpenDevTools: browser is null.");
+        return;
+    }
+
+    CefWindowInfo windowInfo;
+    windowInfo.SetAsPopup(nullptr, "DevTools");
+
+    CefBrowserSettings settings;
+    browser->GetHost()->ShowDevTools(windowInfo, client, settings, CefPoint());
+
+    LOG_DEBUG("[CEF] DevTools opened for browser ID: %d", id);
+}
+
 LRESULT BrowserManager::OnWndProcMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     auto* focused_inst = GetFocusedBrowser();
     if (!focused_inst || !focused_inst->browser)
         return false;
 
-    /*if (msg == WM_KEYDOWN && (GetAsyncKeyState(VK_CONTROL) & 0x8000) && wParam == 'L')
+    if (msg == WM_KEYDOWN && (GetAsyncKeyState(VK_CONTROL) & 0x8000) && wParam == 'L')
     {
         focused_inst->OpenDevTools();
         return true;
-    }*/
+    }
 
     auto host = focused_inst->browser->GetHost();
     if (!host)

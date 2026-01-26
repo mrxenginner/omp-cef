@@ -68,7 +68,20 @@ void CefApi::DestroyBrowser(int playerid, int browserid)
 
 void CefApi::RegisterEvent(const std::string& name, const std::vector<ArgumentType>& signature) 
 {
+	// TODO
+}
 
+void CefApi::EmitEvent(int playerid, int browserid, const std::string& name, const std::vector<Argument>& args)
+{
+	LOG_DEBUG("[CEF] EmitEvent: playerid=%d, browserid=%d, name=%.*s, args=%zu", playerid, browserid, static_cast<int>(name.size()), name.data(), args.size());
+
+	EmitEventPacket event;
+
+	event.browserId = browserid;
+	event.name = std::string(name);
+	event.args = args;
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitBrowserEvent, event);
 }
 
 void CefApi::AttachBrowserToObject(int playerid, int browserid, int objectId)

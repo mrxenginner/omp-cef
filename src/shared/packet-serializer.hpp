@@ -351,6 +351,7 @@ inline bool DeserializePacket(const char* data, size_t size, NetworkPacket& out)
 			break;
 		}
 		case PacketType::EmitEvent:
+		case PacketType::EmitBrowserEvent:
 		case PacketType::ClientEmitEvent: {
             EmitEventPacket packet{};
 

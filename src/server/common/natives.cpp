@@ -26,43 +26,6 @@ PAWN_NATIVE(Natives, CEF_DestroyBrowser, void(int playerid, int browserid))
     CefApi::Instance()->DestroyBrowser(playerid, browserid);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 PAWN_NATIVE(Natives, CEF_RegisterEvent, void(const std::string& eventName, EventSignature signature))
 {
     CefApi::Instance()->RegisterEvent(eventName, signature.types);
@@ -70,8 +33,45 @@ PAWN_NATIVE(Natives, CEF_RegisterEvent, void(const std::string& eventName, Event
 
 PAWN_NATIVE(Natives, CEF_EmitEvent, void(int playerid, int browserid, const std::string& eventName, DynamicArguments arguments))
 {
-    //CefComponent::Instance().EmitEvent(playerid, browserid, eventName, arguments.args);
+    CefApi::Instance()->EmitEvent(playerid, browserid, eventName, arguments.args);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 PAWN_NATIVE(Natives, CEF_ReloadBrowser, void(int playerid, int browserid, bool ignore_cache))
 {

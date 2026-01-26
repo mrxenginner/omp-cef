@@ -23,6 +23,7 @@ public:
     void CreateWorldBrowser(int playerid, int browserid, const std::string& url, const std::string& textureName, float width, float height);
     void DestroyBrowser(int playerid, int browserid);
     void RegisterEvent(const std::string& name, const std::vector<ArgumentType>& signature);
+    void EmitEvent(int playerid, int browserid, const std::string& name, const std::vector<Argument>& args);
 
     void AttachBrowserToObject(int playerid, int browserid, int objectid);
     void DetachBrowserFromObject(int playerid, int browserid, int objectid);

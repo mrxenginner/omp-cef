@@ -43,7 +43,8 @@ enum class PacketType : uint8_t
 	DownloadProgress,
 
 	EmitEvent,
-	ClientEmitEvent
+	EmitBrowserEvent,
+	ClientEmitEvent,
 };
 
 struct RequestJoinPacket

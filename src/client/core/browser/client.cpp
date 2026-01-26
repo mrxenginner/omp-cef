@@ -107,7 +107,7 @@ bool BrowserClient::OnCursorChange(CefRefPtr<CefBrowser> /*browser*/,
     return true;
 }
 
-CefResourceRequestHandler::ReturnValue BrowserClient::OnBeforeResourceLoad(
+/*CefResourceRequestHandler::ReturnValue BrowserClient::OnBeforeResourceLoad(
     CefRefPtr<CefBrowser> browser,
     CefRefPtr<CefFrame> frame,
     CefRefPtr<CefRequest> request,
@@ -149,7 +149,7 @@ CefResourceRequestHandler::ReturnValue BrowserClient::OnBeforeResourceLoad(
     
     request->SetHeaderMap(headers);
     return RV_CONTINUE;
-}
+}*/
 
 void BrowserClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> /*browser*/,
                                          const CefAudioParameters& params,

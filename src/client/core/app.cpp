@@ -96,6 +96,53 @@ void App::OnPacketReceived(const NetworkPacket& packet)
 			}
 			break;
 		}
+		case PacketType::EmitBrowserEvent: {
+			LOG_INFO("----------------------- EmitBrowserEvent");
+
+			const auto& event = std::get<EmitEventPacket>(packet.payload);
+			
+			const int browserId = event.browserId;
+            const std::string& eventName = event.name;
+
+			auto* browser = browser_.GetBrowserInstance(browserId);
+			if (browser && browser->browser) {
+				CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("emit_event");
+                CefRefPtr<CefListValue> list = msg->GetArgumentList();
+
+				list->SetString(0, eventName);
+
+                for (size_t i = 0; i < event.args.size(); ++i) {
+                    const auto& arg = event.args[i];
+                    const size_t list_index = i + 1;
+
+                    switch (arg.type) {
+						case ArgumentType::Integer:
+							list->SetInt(list_index, arg.intValue);
+							break;
+						case ArgumentType::Float:
+							list->SetDouble(list_index, arg.floatValue);
+							break;
+						case ArgumentType::Bool:
+							list->SetBool(list_index, arg.boolValue);
+							break;
+						case ArgumentType::String:
+							list->SetString(list_index, arg.stringValue);
+							break;
+						default:
+							list->SetNull(list_index);
+							break;
+                    }
+                }
+
+                browser->browser->GetMainFrame()->SendProcessMessage(PID_RENDERER, msg);
+                LOG_DEBUG("[CEF] EmitEvent '%s' sent to browser %d with %zu args", eventName.c_str(), browserId, event.args.size());
+			}
+			else {
+                LOG_WARN("[CEF] EmitEvent received but browser %d not found.", browserId);
+            }
+
+			break;
+		}
 		default:
 			break;
 	}
