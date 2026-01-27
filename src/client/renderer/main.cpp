@@ -56,6 +56,57 @@ public:
             events_[eventName].push_back(callback);
             return true;
         }
+        else if (name == "off") {
+            // cef.off() - clear everything
+            if (arguments.size() == 0) {
+                events_.clear();
+                return true;
+            }
+
+            // cef.off(eventName)
+            if (arguments.size() == 1) {
+                if (!arguments[0]->IsString()) {
+                    exception = "Invalid arguments to cef.off(eventName[, callback])";
+                    return true;
+                }
+
+                const std::string eventName = arguments[0]->GetStringValue();
+                events_.erase(eventName);
+                return true;
+            }
+
+            // cef.off(eventName, callback)
+            if (arguments.size() == 2) {
+                if (!arguments[0]->IsString() || !arguments[1]->IsFunction()) {
+                    exception = "Invalid arguments to cef.off(eventName, callback)";
+                    return true;
+                }
+
+                const std::string eventName = arguments[0]->GetStringValue();
+                CefRefPtr<CefV8Value> callback = arguments[1];
+
+                auto it = events_.find(eventName);
+                if (it == events_.end())
+                    return true;
+
+                auto& vec = it->second;
+                vec.erase(
+                    std::remove_if(vec.begin(), vec.end(),
+                        [&](const CefRefPtr<CefV8Value>& cb) {
+                            return cb && cb->IsSame(callback);
+                        }),
+                    vec.end()
+                );
+
+                if (vec.empty())
+                    events_.erase(it);
+
+                return true;
+            }
+
+            exception = "Invalid arguments to cef.off(eventName[, callback])";
+            return true;
+        }
 
         return false;
     }
@@ -75,9 +126,10 @@ public:
         CefRefPtr<CefV8Value> cefObj = CefV8Value::CreateObject(nullptr, nullptr);
         CefRefPtr<CefV8Handler> handler = new V8HandlerImpl();
 
-        // Create the 'cef.on' functions
+        // Create the 'cef.' functions
         cefObj->SetValue("emit", CefV8Value::CreateFunction("emit", handler), V8_PROPERTY_ATTRIBUTE_NONE);
         cefObj->SetValue("on", CefV8Value::CreateFunction("on", handler), V8_PROPERTY_ATTRIBUTE_NONE);
+        cefObj->SetValue("off", CefV8Value::CreateFunction("off", handler), V8_PROPERTY_ATTRIBUTE_NONE);
         global->SetValue("cef", cefObj, V8_PROPERTY_ATTRIBUTE_NONE);
     }
 
