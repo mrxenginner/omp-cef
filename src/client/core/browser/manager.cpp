@@ -73,23 +73,27 @@ bool BrowserManager::Initialize()
     auto base = std::filesystem::path(exe_path).parent_path();
     auto cef_dir = base / "cef";
     auto cache_dir = cef_dir / "cache";
+    auto profile_dir = cache_dir / "profile";
     auto log_file = cef_dir / "debug.log";
 
-    std::filesystem::create_directories(cache_dir);
+    std::filesystem::create_directories(profile_dir);
 
     LOG_DEBUG("[CEF] Base dir: {}", base.string().c_str());
     LOG_DEBUG("[CEF] CEF dir: {}", cef_dir.string().c_str());
     LOG_DEBUG("[CEF] Cache dir: {}", cache_dir.string().c_str());
+    LOG_DEBUG("[CEF] Profile dir: {}", profile_dir.string().c_str());
     LOG_DEBUG("[CEF] Log file: {}", log_file.string().c_str());
 
     CefString(&settings.log_file) = log_file.wstring();
     CefString(&settings.root_cache_path) = cache_dir.wstring();
+    CefString(&settings.cache_path) = profile_dir.wstring(); 
     CefString(&settings.browser_subprocess_path) = (cef_dir / "renderer.exe").wstring();
 
     settings.no_sandbox = true;
     settings.log_severity = LOGSEVERITY_DEBUG;
     settings.multi_threaded_message_loop = true;
     settings.windowless_rendering_enabled = true;
+    settings.persist_session_cookies = true;
 
     int exit_code = CefExecuteProcess(main_args, app.get(), nullptr);
     if (exit_code >= 0)
