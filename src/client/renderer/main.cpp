@@ -2,11 +2,84 @@
 #include "include/cef_render_process_handler.h"
 #include "include/wrapper/cef_helpers.h"
 #include <map>
+#include <variant>
 
 // Global map to store event names and their callback functions
 std::map<std::string, std::vector<CefRefPtr<CefV8Value>>> events_;
 
-class V8HandlerImpl : public CefV8Handler 
+// Queue events that arrive before JS registers a handler (fixes race between server emit and cef.on)
+using PendingArg = std::variant<std::monostate, bool, int, double, std::string>;
+using PendingArgs = std::vector<PendingArg>;
+static std::map<std::string, std::vector<PendingArgs>> pending_events_;
+
+static CefV8ValueList BuildJsArgs(const PendingArgs& pending) {
+    CefV8ValueList jsArgs;
+    jsArgs.reserve(pending.size());
+    for (const auto& arg : pending) {
+        if (std::holds_alternative<bool>(arg)) 
+            jsArgs.push_back(CefV8Value::CreateBool(std::get<bool>(arg)));
+        else if (std::holds_alternative<int>(arg)) 
+            jsArgs.push_back(CefV8Value::CreateInt(std::get<int>(arg)));
+        else if (std::holds_alternative<double>(arg)) 
+            jsArgs.push_back(CefV8Value::CreateDouble(std::get<double>(arg)));
+        else if (std::holds_alternative<std::string>(arg)) 
+            jsArgs.push_back(CefV8Value::CreateString(std::get<std::string>(arg)));
+        else jsArgs.push_back(CefV8Value::CreateNull());
+    }
+
+    return jsArgs;
+}
+
+static PendingArgs CapturePendingArgs(CefRefPtr<CefListValue> args) {
+    PendingArgs out;
+    if (!args) return out;
+
+    const auto size = args->GetSize();
+    if (size <= 1) return out;
+
+    out.reserve(size - 1);
+
+    for (size_t i = 1; i < size; ++i) {
+        switch (args->GetType(i)) {
+            case VTYPE_BOOL:   
+                out.emplace_back(args->GetBool(i)); 
+                break;
+            case VTYPE_INT:    
+                out.emplace_back(args->GetInt(i)); 
+                break;
+            case VTYPE_DOUBLE: 
+                out.emplace_back(args->GetDouble(i)); 
+                break;
+            case VTYPE_STRING: 
+                out.emplace_back(args->GetString(i).ToString()); 
+                break;
+            default:           
+                out.emplace_back(std::monostate{}); 
+                break;
+        }
+    }
+
+    return out;
+}
+
+static void FlushPendingEvents(const std::string& eventName) {
+    auto pit = pending_events_.find(eventName);
+    if (pit == pending_events_.end()) return;
+
+    auto it = events_.find(eventName);
+    if (it == events_.end() || it->second.empty()) return;
+
+    for (const auto& pending : pit->second) {
+        CefV8ValueList jsArgs = BuildJsArgs(pending);
+        for (const auto& cb : it->second) {
+            if (cb) cb->ExecuteFunction(nullptr, jsArgs);
+        }
+    }
+
+    pending_events_.erase(pit);
+}
+
+class V8HandlerImpl : public CefV8Handler
 {
 public:
     bool Execute(const CefString& name,
@@ -28,15 +101,15 @@ public:
             for (size_t i = 1; i < arguments.size(); ++i) {
                 auto arg = arguments[i];
 
-                if (arg->IsBool()) 
+                if (arg->IsBool())
                     list->SetBool(i, arg->GetBoolValue());
-                else if (arg->IsInt()) 
+                else if (arg->IsInt())
                     list->SetInt(i, arg->GetIntValue());
-                else if (arg->IsDouble()) 
+                else if (arg->IsDouble())
                     list->SetDouble(i, arg->GetDoubleValue());
-                else if (arg->IsString()) 
+                else if (arg->IsString())
                     list->SetString(i, arg->GetStringValue());
-                else 
+                else
                     list->SetNull(i);
             }
 
@@ -54,12 +127,16 @@ public:
 
             // Store the callback function to be called later
             events_[eventName].push_back(callback);
+
+            // Flush queued events for this eventName (if any)
+            FlushPendingEvents(eventName);
             return true;
         }
         else if (name == "off") {
             // cef.off() - clear everything
             if (arguments.size() == 0) {
                 events_.clear();
+                pending_events_.clear();
                 return true;
             }
 
@@ -72,6 +149,7 @@ public:
 
                 const std::string eventName = arguments[0]->GetStringValue();
                 events_.erase(eventName);
+                pending_events_.erase(eventName);
                 return true;
             }
 
@@ -130,15 +208,9 @@ public:
         cefObj->SetValue("emit", CefV8Value::CreateFunction("emit", handler), V8_PROPERTY_ATTRIBUTE_NONE);
         cefObj->SetValue("on", CefV8Value::CreateFunction("on", handler), V8_PROPERTY_ATTRIBUTE_NONE);
         cefObj->SetValue("off", CefV8Value::CreateFunction("off", handler), V8_PROPERTY_ATTRIBUTE_NONE);
+
+        // Add the object to the global window scope
         global->SetValue("cef", cefObj, V8_PROPERTY_ATTRIBUTE_NONE);
-    }
-
-    void OnContextReleased(CefRefPtr<CefBrowser> browser,
-        CefRefPtr<CefFrame> frame,
-        CefRefPtr<CefV8Context> context) override {
-
-        CEF_REQUIRE_RENDERER_THREAD();
-        events_.clear();
     }
 
     bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
@@ -178,19 +250,20 @@ public:
                 }
             }
 
-            // Find and execute the stored JavaScript callbacks
-            CefRefPtr<CefV8Context> context = frame->GetV8Context();
-            if (context->Enter()) {
-                auto it = events_.find(eventName);
-                if (it != events_.end()) {
-                    for (const auto& cb : it->second) {
-                        cb->ExecuteFunction(nullptr, jsArgs);
-                    }
-                }
+            auto it = events_.find(eventName);
+            const bool hasHandler = (it != events_.end() && !it->second.empty());
 
-                context->Exit();
+            CefRefPtr<CefV8Context> context = frame->GetV8Context();
+            if (!hasHandler || !context || !context->Enter()) {
+                pending_events_[eventName].push_back(CapturePendingArgs(args));
+                return true;
             }
 
+            for (const auto& cb : it->second) {
+                if (cb) cb->ExecuteFunction(nullptr, jsArgs);
+            }
+
+            context->Exit();
             return true;
         }
 
