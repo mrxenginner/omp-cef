@@ -372,15 +372,6 @@ void NetworkManager::SendRaw(const char* data, int size) {
 	);
 }
 
-/*void NetworkManager::SendRaw(const char* data, int size) {
-	socket_.async_send_to(
-		asio::buffer(data, size), server_endpoint_,
-		[this, size](std::error_code ec, std::size_t) {
-			if (!ec) LOG_DEBUG("[CLIENT] Sent {} raw bytes to server.", size);
-		}
-	);
-}*/
-
 void NetworkManager::SetPacketHandler(PacketHandler handler) 
 {
 	std::lock_guard lock(handler_mutex_);
@@ -389,8 +380,6 @@ void NetworkManager::SetPacketHandler(PacketHandler handler)
 
 void NetworkManager::SendBrowserCreateResult(int browserId, bool success, int code, const std::string& reason)
 {
-	LOG_INFO("SendBrowserCreateResult");
-
 	ClientEmitEventPacket event;
     event.name = CefEvent::Client::BrowserCreateResult;
     event.browserId = browserId;

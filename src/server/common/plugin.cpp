@@ -156,7 +156,10 @@ void CefPlugin::OnPacketReceived(const asio::ip::udp::endpoint& from, const char
 {
 	auto network_session = sessions_->GetSessionFromAddress(from);
 	if (network_session && network_session->handshake_status == HandshakeStatus::CONNECTED && network_session->kcp_instance) {
-		ikcp_input(network_session->kcp_instance, data, len);
+		{
+			std::lock_guard<std::mutex> lock(network_session->kcp_mutex);
+			ikcp_input(network_session->kcp_instance, data, len);
+		}
 		HandleKcpInput(network_session);
 		return;
 	}
@@ -245,57 +248,72 @@ void CefPlugin::HandleHandshakeFinalize(const asio::ip::udp::endpoint& from,
 
 void CefPlugin::HandleKcpInput(std::shared_ptr<NetworkSession> session)
 {
-	std::lock_guard<std::mutex> lock(session->kcp_mutex);
+    if (!session)
+        return;
 
-	if (!session->kcp_instance) 
-		return;
+    std::vector<NetworkPacket> pendingPackets;
 
-	std::vector<char> kcp_buffer(65535);
-	int msg_size;
+    {
+        std::lock_guard<std::mutex> lock(session->kcp_mutex);
 
-	while ((msg_size = ikcp_recv(session->kcp_instance, kcp_buffer.data(), static_cast<int>(kcp_buffer.size()))) > 0)
-	{
-		std::vector<uint8_t> decrypted = DecryptPacket({ kcp_buffer.begin(), kcp_buffer.begin() + msg_size }, session->rx_key);
-		if (decrypted.empty())
-			continue;
+        if (!session->kcp_instance)
+            return;
 
-		NetworkPacket packet;
-		if (!DeserializePacket(reinterpret_cast<const char*>(decrypted.data()), decrypted.size(), packet))
-			continue;
+        std::vector<char> kcp_buffer(65535);
+        int msg_size;
 
-		switch (packet.type)
-		{
-			case PacketType::RequestFiles:
-			{
-				HandleFileRequest(session->playerid, std::get<RequestFilesPacket>(packet.payload));
-				break;
-			}
-			case PacketType::DownloadStarted:
-			{
-				const auto& download_started_packet = std::get<DownloadStartedPacket>(packet.payload);
-				resource_dialog_->StartForPlayer(session->playerid, download_started_packet.files_to_download);
-				break;
-			}
-			case PacketType::DownloadProgress:
-			{
-				const auto& download_progress_packet = std::get<DownloadProgressPacket>(packet.payload);
-				resource_dialog_->UpdateProgress(session->playerid, download_progress_packet.file_index, download_progress_packet.bytes_received);
-				break;
-			}
-			case PacketType::ClientEmitEvent:
-			{
-				if (auto* event = std::get_if<ClientEmitEventPacket>(&packet.payload)) {
-					HandleClientEvent(session->playerid, *event);
-				} 
-				else {
-					LOG_ERROR("ClientEmitEvent payload mismatch (variant index=%zu)", packet.payload.index());
-				}
-				break;
-			}
-			default:
-				break;
-		}
-	}
+        while ((msg_size = ikcp_recv(session->kcp_instance, kcp_buffer.data(),
+            static_cast<int>(kcp_buffer.size()))) > 0)
+        {
+            std::vector<uint8_t> decrypted =
+                DecryptPacket({ kcp_buffer.begin(), kcp_buffer.begin() + msg_size }, session->rx_key);
+
+            if (decrypted.empty())
+                continue;
+
+            NetworkPacket packet;
+            if (!DeserializePacket(reinterpret_cast<const char*>(decrypted.data()), decrypted.size(), packet))
+                continue;
+
+            pendingPackets.emplace_back(std::move(packet));
+        }
+    }
+
+    for (auto& packet : pendingPackets)
+    {
+        switch (packet.type)
+        {
+            case PacketType::RequestFiles:
+            {
+                HandleFileRequest(session->playerid, std::get<RequestFilesPacket>(packet.payload));
+                break;
+            }
+            case PacketType::DownloadStarted:
+            {
+                const auto& download_started_packet = std::get<DownloadStartedPacket>(packet.payload);
+                resource_dialog_->StartForPlayer(session->playerid, download_started_packet.files_to_download);
+                break;
+            }
+            case PacketType::DownloadProgress:
+            {
+                const auto& download_progress_packet = std::get<DownloadProgressPacket>(packet.payload);
+                resource_dialog_->UpdateProgress(session->playerid, download_progress_packet.file_index, download_progress_packet.bytes_received);
+                break;
+            }
+            case PacketType::ClientEmitEvent:
+            {
+                if (auto* event = std::get_if<ClientEmitEventPacket>(&packet.payload)) {
+                    HandleClientEvent(session->playerid, *event);
+                }
+                else {
+                    LOG_ERROR("ClientEmitEvent payload mismatch (variant index=%zu)", packet.payload.index());
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
 }
 
 void CefPlugin::HandleFileRequest(int playerid, const RequestFilesPacket& request)
@@ -401,13 +419,6 @@ void CefPlugin::ProcessFileTransfers()
 
             SendPacketToPlayer(session->playerid, PacketType::FileData, packet);
 
-            /*LOG_DEBUG("[Transfer] Sent chunk %d/%d (%zu bytes) to player %d - file '%s'",
-                transfer->currentChunkIndex + 1,
-                transfer->totalChunks,
-                chunkSize,
-                session->playerid,
-                transfer->relativePath);*/
-
             ++transfer->currentChunkIndex;
             ++sent_this_tick;
         }
@@ -459,27 +470,30 @@ void CefPlugin::SendRawPacketToEndpoint(const asio::ip::udp::endpoint& endpoint,
 
 void CefPlugin::SendPacketToPlayer(int playerid, PacketType type, const PacketPayload& payload)
 {
-	auto session = sessions_->GetSession(playerid);
-	if (!session) 
-		return;
+    auto session = sessions_->GetSession(playerid);
+    if (!session)
+        return;
 
-	std::lock_guard<std::mutex> lock(session->kcp_mutex);
+    NetworkPacket packet{ type, payload };
 
-	if (!session->kcp_instance) 
-		return;
+    std::string raw_data;
+    if (!SerializePacket(packet, raw_data)) {
+        LOG_ERROR("Failed to serialize packet (type %d) for player %d", (int)type, playerid);
+        return;
+    }
 
-	NetworkPacket packet{ type, payload };
-	std::string raw_data;
-	if (!SerializePacket(packet, raw_data)) {
-		LOG_ERROR("Failed to serialize packet (type %d) for player %d", static_cast<int>(type), playerid);
-		return;
-	}
+    std::vector<uint8_t> encrypted = EncryptPacket({ raw_data.begin(), raw_data.end() }, session->tx_key);
+    if (encrypted.empty())
+        return;
 
-	std::vector<uint8_t> encrypted = EncryptPacket({ raw_data.begin(), raw_data.end() }, session->tx_key);
-	if (encrypted.empty()) 
-		return;
+    std::lock_guard<std::mutex> lock(session->kcp_mutex);
+    if (!session->kcp_instance)
+        return;
 
-	ikcp_send(session->kcp_instance, reinterpret_cast<const char*>(encrypted.data()), encrypted.size());
+    ikcp_send(session->kcp_instance, (const char*)encrypted.data(), (int)encrypted.size());
+
+	// TODO: Not always flush immediately (for file transfer?)
+    ikcp_flush(session->kcp_instance);
 }
 
 void CefPlugin::NotifyCefInitialize(std::shared_ptr<NetworkSession> session, bool ok)

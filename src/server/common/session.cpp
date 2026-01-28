@@ -49,7 +49,7 @@ void NetworkSessionManager::RemovePlayer(int playerid)
     }
 }
 
-void NetworkSessionManager::UpdateAllKcpInstances(uint32_t now_ms)
+/*void NetworkSessionManager::UpdateAllKcpInstances(uint32_t now_ms)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
 
@@ -59,6 +59,31 @@ void NetworkSessionManager::UpdateAllKcpInstances(uint32_t now_ms)
 			ikcp_update(session->kcp_instance, now_ms);
 		}
 	}
+}*/
+
+void NetworkSessionManager::UpdateAllKcpInstances(uint32_t now_ms)
+{
+    std::vector<std::shared_ptr<NetworkSession>> sessions;
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        sessions.reserve(player_sessions_.size());
+
+        for (auto& [playerid, session] : player_sessions_) {
+            if (session && session->kcp_instance &&
+                session->handshake_status == HandshakeStatus::CONNECTED) {
+                sessions.push_back(session);
+            }
+        }
+    }
+
+    for (auto& session : sessions) {
+        std::lock_guard<std::mutex> lock(session->kcp_mutex);
+        if (session->kcp_instance &&
+            session->handshake_status == HandshakeStatus::CONNECTED) {
+            ikcp_update(session->kcp_instance, now_ms);
+        }
+    }
 }
 
 std::shared_ptr<NetworkSession> NetworkSessionManager::GetOrCreateSession(int playerid)

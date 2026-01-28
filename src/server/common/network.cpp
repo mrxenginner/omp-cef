@@ -71,8 +71,17 @@ void NetworkServer::DoReceive()
         {
             if (running_ && !ec && bytes_recvd > 0)
             {
-                handler_(remote_endpoint_, recv_buffer_.data(), static_cast<int>(bytes_recvd));
+                try { 
+                    handler_(remote_endpoint_, recv_buffer_.data(), (int)bytes_recvd); 
+                }
+                catch (const std::exception& e) { 
+                    LOG_ERROR("[Network] handler exception: %s", e.what()); 
+                }
+                catch (...) { 
+                    LOG_ERROR("[Network] handler unknown exception"); 
+                }
             }
+
             if (running_ && ec != asio::error::operation_aborted)
             {
                 DoReceive();
