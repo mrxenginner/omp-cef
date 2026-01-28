@@ -97,8 +97,6 @@ void App::OnPacketReceived(const NetworkPacket& packet)
 			break;
 		}
 		case PacketType::EmitBrowserEvent: {
-			LOG_INFO("----------------------- EmitBrowserEvent");
-
 			const auto& event = std::get<EmitEventPacket>(packet.payload);
 			
 			const int browserId = event.browserId;
@@ -135,10 +133,10 @@ void App::OnPacketReceived(const NetworkPacket& packet)
                 }
 
                 browser->browser->GetMainFrame()->SendProcessMessage(PID_RENDERER, msg);
-                LOG_DEBUG("[CEF] EmitEvent '%s' sent to browser %d with %zu args", eventName.c_str(), browserId, event.args.size());
+				LOG_DEBUG("[CEF] EmitEvent {} sent to browser {} with {} args", eventName.c_str(), browserId, event.args.size());
 			}
 			else {
-                LOG_WARN("[CEF] EmitEvent received but browser %d not found.", browserId);
+                LOG_WARN("[CEF] EmitEvent received but browser {} not found.", browserId);
             }
 
 			break;

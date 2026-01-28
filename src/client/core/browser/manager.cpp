@@ -365,9 +365,9 @@ void BrowserManager::DetachBrowserFromObject(int browserId, int objectId)
         auto it = entityToBrowserId_.find(nativeEntity);
         if (it != entityToBrowserId_.end() && it->second == browserId)
         {
-            OnAfterEntityRender(nativeEntity);  // ensure texture restored
+            OnAfterEntityRender(nativeEntity); // ensure texture restored
             entityToBrowserId_.erase(it);
-            audio_.SetStreamMuted(browserId, true);  // mute when detached
+            audio_.SetStreamMuted(browserId, true); // mute when detached
             LOG_DEBUG("[CEF] Browser {} detached from object {} (Entity: {})",
                       browserId,
                       objectId,
@@ -382,10 +382,6 @@ void BrowserManager::DetachBrowserFromObject(int browserId, int objectId)
 
 CEntity* BrowserManager::GetEntityFromObjectId(int objectId)
 {
-    /*if (entity_resolver_)
-        return entity_resolver_(objectId);
-    LOG_WARN("[CEF] No entity resolver set; cannot map objectId {} to CEntity*.", objectId);*/
-    
     auto* netGame = GetComponent<NetGameComponent>();
     if (!netGame)
         return nullptr;
