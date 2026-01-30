@@ -73,7 +73,7 @@ jobs:
           CLIENT_DLL="${BUILD_DIR}/src/client/core/${CFG}/client.dll"
           LOADER_ASI="${BUILD_DIR}/src/client/loader/${CFG}/cef.asi"
           RENDERER_EXE="${BUILD_DIR}/src/client/renderer/${CFG}/Renderer.exe"
-          OPENAL_DLL="${{ env.VCPKG_ROOT }}/installed/x86-windows/bin/OpenAL32.dll"
+          OPENAL_DLL="${{ github.workspace }}/vcpkg_installed/x86-windows-static/bin/OpenAL32.dll"
 
           rm -rf package && mkdir -p package/cef
 
@@ -81,7 +81,7 @@ jobs:
           CEF_ROOT_PATH="deps/cef/cef_binary_${{ inputs.cef-version }}_${{ inputs.cef-arch }}"
           test -d "${CEF_ROOT_PATH}" || (echo "CEF not found at ${CEF_ROOT_PATH}" && exit 1)
 
-          cp -R "${CEF_ROOT_PATH}/Release/"*   package/cef/
+          cp -R "${CEF_ROOT_PATH}/Release/"* package/cef/
           cp -R "${CEF_ROOT_PATH}/Resources/"* package/cef/
           rm -f package/cef/bootstrap.exe package/cef/bootstrapc.exe || true
 
@@ -89,11 +89,18 @@ jobs:
           test -f "$CLIENT_DLL" || (echo "Missing $CLIENT_DLL" && exit 1)
           test -f "$LOADER_ASI" || (echo "Missing $LOADER_ASI" && exit 1)
           test -f "$RENDERER_EXE" || (echo "Missing $RENDERER_EXE" && exit 1)
+          test -f "$OPENAL_DLL" || (echo "Missing OpenAL32.dll at $OPENAL_DLL" && exit 1)
 
           cp "$CLIENT_DLL" package/cef/client.dll
           cp "$LOADER_ASI" package/cef.asi
           cp "$RENDERER_EXE" package/cef/renderer.exe
           cp "$OPENAL_DLL" package/cef/OpenAL32.dll
+          
+          OPENAL_LICENSE="${{ github.workspace }}/vcpkg_installed/${TRIPLET}/share/openal-soft/copyright"
+          if [ -f "$OPENAL_LICENSE" ]; then
+            mkdir -p package/licenses
+            cp "$OPENAL_LICENSE" package/licenses/openal-soft.txt
+          fi
           
       - name: Compress client files
         shell: pwsh
