@@ -283,23 +283,10 @@ void NetworkManager::SendPacket(PacketType type, const PacketPayload& payload)
 		return;
 	}
 
-	LOG_DEBUG("----------------Packet serialized successfully, size={}", raw.size());
-	// LOG_DEBUG("----------------Packet serialized successfully, state_={}", static_cast<int>(state_.load()));
-
 	std::lock_guard<std::mutex> lock(kcp_mutex_);
-
-	/*if (!state_.compare_exchange_strong(expected, DownloadState::VERIFYING_CACHE)) {
-		LOG_WARN("[ResourceManager] TriggerDownload called in wrong state: {}", static_cast<int>(state_.load()));
-		return;
-	}*/
 
 
 	if (kcp_instance_ && state_ == ConnectionState::CONNECTED) {
-		LOG_DEBUG("-------------------------------- Sending KCP packet...");
-
-		LOG_DEBUG("[CLIENT] tx_key_ size: {}", tx_key_.size());
-		LOG_DEBUG("[CLIENT] raw data size: {}", raw.size());
-
 		if (tx_key_.empty()) {
 			LOG_ERROR("[CLIENT] tx_key_ is empty!");
 			return;
@@ -339,7 +326,6 @@ void NetworkManager::SendPacket(PacketType type, const PacketPayload& payload)
 		LOG_DEBUG("[CLIENT] KCP packet sent successfully");
 	}
 	else {
-		LOG_DEBUG("------------------------ Sending raw UDP packet...");
 		SendRaw(raw.data(), static_cast<int>(raw.size()));
 	}
 }

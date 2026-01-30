@@ -56,11 +56,16 @@ bool SampVersionManager::Initialize()
 
     LOG_DEBUG("SA:MP version detected : {}.{}.{}.{}", major, minor, build, revision);
 
-    if      (major == 0 && minor == 3 && build == 7 && revision == 0) _version = SampVersion::V037;
-    else if (major == 0 && minor == 3 && build == 7 && revision == 2) _version = SampVersion::V037R3;
-    else if (major == 0 && minor == 3 && build == 7 && revision == 5) _version = SampVersion::V037R5;
-    else if (major == 0 && minor == 3 && build == 8 && revision == 0) _version = SampVersion::V03DLR1;
-    else                                                              _version = SampVersion::Unknown;
+    if      (major == 0 && minor == 3 && build == 7 && revision == 0) 
+        _version = SampVersion::V037;
+    else if (major == 0 && minor == 3 && build == 7 && revision == 2) 
+        _version = SampVersion::V037R3;
+    else if (major == 0 && minor == 3 && build == 7 && revision == 5) 
+        _version = SampVersion::V037R5;
+    else if (major == 0 && minor == 3 && build == 8 && revision == 0) 
+        _version = SampVersion::V03DLR1;
+    else                                                              
+        _version = SampVersion::Unknown;
 
     LOG_INFO("Detected SA-MP version : {}", GetVersionString());
     return true;
@@ -70,10 +75,15 @@ const char* SampVersionManager::GetVersionString() const
 {
     switch (_version)
     {
-        case SampVersion::V037:    return "0.3.7-R1";
-        case SampVersion::V037R3:  return "0.3.7-R3-1";
-        case SampVersion::V037R5:  return "0.3.7-R5-1";
-        case SampVersion::V03DLR1: return "0.3.DL-R1";
-        default:                   return "Unknown";
+        case SampVersion::V037:    
+            return "0.3.7-R1";
+        case SampVersion::V037R3:  
+            return "0.3.7-R3-1";
+        case SampVersion::V037R5:  
+            return "0.3.7-R5-1";
+        case SampVersion::V03DLR1: 
+            return "0.3.DL-R1";
+        default:                   
+            return "Unknown";
     }
 }
