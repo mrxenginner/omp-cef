@@ -42,10 +42,9 @@ jobs:
             mv temp-assets/client-files-v${{ inputs.version }}/* release-assets/
           fi
           if [ -d "temp-assets/individual-files-v${{ inputs.version }}" ]; then
-            mv temp-assets/individual-files-v${{ inputs.version }}/cef.asi            release-assets/ || true
-            mv temp-assets/individual-files-v${{ inputs.version }}/cef/client.dll     release-assets/ || true
+            mv temp-assets/individual-files-v${{ inputs.version }}/cef.asi release-assets/ || true
+            mv temp-assets/individual-files-v${{ inputs.version }}/cef/client.dll release-assets/ || true
             mv temp-assets/individual-files-v${{ inputs.version }}/cef/renderer.exe  release-assets/ || true
-            # mv temp-assets/individual-files-v${{ inputs.version }}/cef/OpenAL32.dll  release-assets/ || true
           fi
 
           echo "Processing server files..."
@@ -58,17 +57,17 @@ jobs:
             echo "Warning: Pawn include file not found at $INCLUDE_FILE"
           fi
 
-          find temp-assets/server-Samp-x86-Windows -name "*.dll" -exec mv {} package-samp/plugins/cef.dll \; || true
-          find temp-assets/server-Samp-x86-Linux -name "*.so"  -exec mv {} package-samp/plugins/cef.so  \; || true
+          find temp-assets/server-ServerSamp-x86-Windows -name "*.dll" -exec mv {} package-samp/plugins/cef.dll \; || true
+          find temp-assets/server-ServerSamp-x86-Linux  -name "*.so"  -exec mv {} package-samp/plugins/cef.so  \; || true
           
-          find temp-assets/server-Omp-x86-Windows -name "*.dll" -exec mv {} package-omp-x86/components/Cef.dll \; || true
-          find temp-assets/server-Omp-x86-Linux -name "*.so"  -exec mv {} package-omp-x86/components/Cef.so  \; || true
+          find temp-assets/server-ServerOmp-x86-Windows -name "*.dll" -exec mv {} package-omp-x86/components/Cef.dll \; || true
+          find temp-assets/server-ServerOmp-x86-Linux  -name "*.so"  -exec mv {} package-omp-x86/components/Cef.so  \; || true
 
-          find temp-assets/server-Omp-x64-Windows -name "*.dll" -exec mv {} package-omp-x64/components/Cef.dll \; || true
-          find temp-assets/server-Omp-x64-Linux -name "*.so"  -exec mv {} package-omp-x64/components/Cef.so  \; || true
+          find temp-assets/server-ServerOmp-x64-Windows -name "*.dll" -exec mv {} package-omp-x64/components/Cef.dll \; || true
+          find temp-assets/server-ServerOmp-x64-Linux  -name "*.so"  -exec mv {} package-omp-x64/components/Cef.so  \; || true
           
           echo "Creating server archives..."
-          (cd package-samp    && zip -r ../release-assets/cef-samp-v${{ inputs.version }}.zip .)
+          (cd package-samp && zip -r ../release-assets/cef-samp-v${{ inputs.version }}.zip .)
           (cd package-omp-x86 && zip -r ../release-assets/cef-omp-v${{ inputs.version }}-x86.zip .)
           (cd package-omp-x64 && zip -r ../release-assets/cef-omp-v${{ inputs.version }}-x64.zip .)
 
