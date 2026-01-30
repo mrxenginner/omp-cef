@@ -28,7 +28,7 @@ static std::string GetInternalLoadingHtml()
                     .title{font-size:18px;font-weight:700;margin:0 0 10px}
                     .sub{opacity:.75;font-size:13px;margin:0 0 14px}
                     .bar{height:12px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
-                    .fill{height:100%;width:0%;background:linear-gradient(90deg,#63e,#3cf)}
+                    .fill{height:100%;width:0%;/*background:linear-gradient(90deg,#63e,#3cf)*/background:#ff9933;}
                     .row{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:12px;opacity:.85}
                     .file{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%}
                 </style>
@@ -49,7 +49,7 @@ static std::string GetInternalLoadingHtml()
                             <div id="pct">0%</div>
                         </div>
 
-                        <div class="row">
+                        <div class="row justify-content-end">
                             <div id="speed">0 KB/s</div>
                             <!--<div id="eta">—</div>-->
                         </div>
