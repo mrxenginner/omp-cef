@@ -27,11 +27,7 @@ static void ConfigureBrowserSettings(CefBrowserSettings& settings)
     settings.javascript_dom_paste = STATE_ENABLED;
     settings.remote_fonts = STATE_ENABLED;
     settings.webgl = STATE_ENABLED;
-
-    //settings.databases = STATE_ENABLED;
-    //settings.local_storage = STATE_ENABLED;
-    //settings.application_cache = STATE_ENABLED;
-    //settings.tab_to_links = STATE_DISABLED;
+    settings.tab_to_links = STATE_DISABLED;
 }
 
 static uint32_t GetCefEventFlags()
@@ -118,6 +114,224 @@ bool BrowserManager::Initialize()
     return true;
 }
 
+static bool StartsWithI(const std::string& s, const std::string& prefix)
+{
+    if (s.size() < prefix.size()) return false;
+    for (size_t i = 0; i < prefix.size(); ++i)
+    {
+        if (std::tolower((unsigned char)s[i]) != std::tolower((unsigned char)prefix[i]))
+            return false;
+    }
+    return true;
+}
+
+static std::string UrlDecode(const std::string& in)
+{
+    std::string out;
+    out.reserve(in.size());
+
+    for (size_t i = 0; i < in.size(); ++i)
+    {
+        const char c = in[i];
+        if (c == '%' && i + 2 < in.size())
+        {
+            auto hex = [](char h) -> int {
+                if (h >= '0' && h <= '9') 
+                    return h - '0';
+                if (h >= 'a' && h <= 'f') 
+                    return 10 + (h - 'a');
+                if (h >= 'A' && h <= 'F') 
+                    return 10 + (h - 'A');
+
+                return -1;
+            };
+
+            const int hi = hex(in[i+1]);
+            const int lo = hex(in[i+2]);
+
+            if (hi >= 0 && lo >= 0)
+            {
+                out.push_back((char)((hi << 4) | lo));
+                i += 2;
+                continue;
+            }
+        }
+
+        if (c == '+') { 
+            out.push_back(' '); 
+            continue; 
+        }
+
+        out.push_back(c);
+    }
+
+    return out;
+}
+
+static std::string GetQueryParam(const std::string& url, const std::string& key)
+{
+    const auto qpos = url.find('?');
+    if (qpos == std::string::npos) 
+        return {};
+
+    const auto frag = url.find('#', qpos + 1);
+    const std::string qs = url.substr(qpos + 1, (frag == std::string::npos ? url.size() : frag) - (qpos + 1));
+
+    size_t start = 0;
+    while (start < qs.size())
+    {
+        const size_t amp = qs.find('&', start);
+        const size_t end = (amp == std::string::npos) ? qs.size() : amp;
+        const size_t eq = qs.find('=', start);
+
+        std::string k, v;
+        if (eq != std::string::npos && eq < end)
+        {
+            k = qs.substr(start, eq - start);
+            v = qs.substr(eq + 1, end - (eq + 1));
+        }
+        else
+        {
+            k = qs.substr(start, end - start);
+        }
+
+        if (UrlDecode(k) == key)
+            return UrlDecode(v);
+
+        start = end + 1;
+    }
+
+    return {};
+}
+
+static std::string ExtractYouTubeId(const std::string& url)
+{
+    // Accept:
+    // - https://www.youtube.com/embed/VIDEO_ID
+    // - https://youtu.be/VIDEO_ID
+    // - https://www.youtube.com/watch?v=VIDEO_ID
+    // - https://www.youtube.com/shorts/VIDEO_ID
+    const std::string u = url;
+
+    auto extractAfter = [&](const std::string& needle) -> std::string {
+        auto p = u.find(needle);
+        if (p == std::string::npos) 
+            return {};
+
+        p += needle.size();
+        if (p >= u.size()) 
+            return {};
+
+        size_t e = p;
+        while (e < u.size())
+        {
+            const char c = u[e];
+            if (c == '?' || c == '&' || c == '#' || c == '/') 
+                break;
+
+            ++e;
+        }
+
+        return u.substr(p, e - p);
+    };
+
+    if (auto id = extractAfter("youtube.com/embed/"); !id.empty()) return id;
+    if (auto id = extractAfter("youtube-nocookie.com/embed/"); !id.empty()) return id;
+    if (auto id = extractAfter("youtu.be/"); !id.empty()) return id;
+    if (auto id = extractAfter("youtube.com/shorts/"); !id.empty()) return id;
+
+    if (StartsWithI(u, "http") && u.find("youtube.com/") != std::string::npos)
+    {
+        auto id = GetQueryParam(u, "v");
+        if (!id.empty()) return id;
+    }
+
+    return {};
+}
+
+static std::string NormalizeUrlForEmbeds(const std::string& url)
+{
+    // YouTube -> internal wrapper
+    if (url.find("youtube.com") != std::string::npos || url.find("youtu.be") != std::string::npos || url.find("youtube-nocookie.com") != std::string::npos)
+    {
+        const std::string id = ExtractYouTubeId(url);
+        if (!id.empty())
+        {
+            const std::string autoplay = GetQueryParam(url, "autoplay").empty() ? "1" : GetQueryParam(url, "autoplay");
+            const std::string mute = GetQueryParam(url, "mute").empty() ? "1" : GetQueryParam(url, "mute");
+            const std::string controls = GetQueryParam(url, "controls").empty() ? "0" : GetQueryParam(url, "controls");
+            const std::string rel = GetQueryParam(url, "rel").empty() ? "0" : GetQueryParam(url, "rel");
+            const std::string start = GetQueryParam(url, "start");
+            const std::string end = GetQueryParam(url, "end");
+
+            std::string internal = "http://cef/__internal/youtube.html?v=" + id +
+                "&autoplay=" + autoplay +
+                "&mute=" + mute +
+                "&controls=" + controls +
+                "&rel=" + rel;
+
+            if (!start.empty()) internal += "&start=" + start;
+            if (!end.empty()) internal += "&end=" + end;
+
+            return internal;
+        }
+    }
+
+    // Twitch -> internal wrapper
+    if (url.find("twitch.tv") != std::string::npos)
+    {
+        // If already a player.twitch.tv URL, we keep query but strip "parent".
+        const auto qpos = url.find('?');
+        if (qpos != std::string::npos)
+        {
+            std::string qs = url.substr(qpos + 1);
+
+            std::string out;
+            size_t start = 0;
+            while (start < qs.size())
+            {
+                size_t amp = qs.find('&', start);
+                size_t end = (amp == std::string::npos) ? qs.size() : amp;
+                std::string kv = qs.substr(start, end - start);
+
+                std::string k = kv;
+                auto eq = kv.find('=');
+                if (eq != std::string::npos) k = kv.substr(0, eq);
+                k = UrlDecode(k);
+
+                if (k != "parent")
+                {
+                    if (!out.empty()) out.push_back('&');
+                    out += kv;
+                }
+
+                start = end + 1;
+            }
+
+            if (out.find("channel=") != std::string::npos || out.find("video=") != std::string::npos || out.find("clip=") != std::string::npos)
+            {
+                return std::string("http://cef/__internal/twitch.html?") + out;
+            }
+        }
+
+        // https://www.twitch.tv/<channel> -> internal wrapper
+        const auto slash = url.rfind('/');
+        if (slash != std::string::npos && slash + 1 < url.size())
+        {
+            std::string tail = url.substr(slash + 1);
+            const auto q = tail.find_first_of("?#");
+            if (q != std::string::npos) tail = tail.substr(0, q);
+
+            if (!tail.empty() && tail != "videos" && tail != "clips")
+            {
+                return std::string("http://cef/__internal/twitch.html?channel=") + tail;
+            }
+        }
+    }
+
+    return url;
+}
+
 void BrowserManager::Shutdown()
 {
     if (!initialized_ || is_shutting_down_.exchange(true))
@@ -154,13 +368,18 @@ void BrowserManager::CreateWorldBrowser(
 {
     LOG_DEBUG("[CEF] CreateWorldBrowser called with ID={}, url={}", id, url);
     
+    const std::string normalized_url = NormalizeUrlForEmbeds(url);
+    if (normalized_url != url)
+        LOG_DEBUG("[CEF] Normalized URL -> {}", normalized_url);
+
     if (browsers_.count(id))
     {
         LOG_ERROR("[CEF] CreateWorldBrowser failed: Browser with ID {} already exists.", id);
         LOG_ERROR("[CEF] Existing browser mode: {}", (int)browsers_[id]->mode);
         return;
     }
-    CreateWorldBrowserInternal(id, url, textureName, width, height);
+
+    CreateWorldBrowserInternal(id, normalized_url, textureName, width, height);
 }
 
 void BrowserManager::CreateBrowserInternal(

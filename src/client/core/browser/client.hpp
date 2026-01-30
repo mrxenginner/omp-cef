@@ -60,11 +60,18 @@ public:
     const CefString& request_initiator,
     bool& disable_default_handling) override { return this; }
 
-    /*CefResourceRequestHandler::ReturnValue OnBeforeResourceLoad(
+    bool OnBeforeBrowse(
         CefRefPtr<CefBrowser> browser,
         CefRefPtr<CefFrame> frame,
         CefRefPtr<CefRequest> request,
-        CefRefPtr<CefCallback> callback) override;*/
+        bool user_gesture,
+        bool is_redirect) override;
+
+    CefResourceRequestHandler::ReturnValue OnBeforeResourceLoad(
+        CefRefPtr<CefBrowser> browser,
+        CefRefPtr<CefFrame> frame,
+        CefRefPtr<CefRequest> request,
+        CefRefPtr<CefCallback> callback) override;
 
     // CefAudioHandler overrides
     void OnAudioStreamStarted(CefRefPtr<CefBrowser> browser, const CefAudioParameters& params, int channels) override;

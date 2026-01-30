@@ -132,6 +132,136 @@ static std::string GetInternalLoadingHtml()
         </html>)HTML";
 }
 
+static std::string GetInternalYouTubeHtml()
+{
+    return R"HTML(<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="origin">
+  <title>YouTube</title>
+  <style>
+    html,body{margin:0;height:100%;background:#000;overflow:hidden}
+    iframe{border:0;width:100%;height:100%;display:block}
+  </style>
+</head>
+<body>
+  <iframe id="yt"
+    sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-forms"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen
+    referrerpolicy="origin"></iframe>
+
+  <script>
+    (function(){
+      const u = new URL(location.href);
+      const v = u.searchParams.get('v') || '';
+      if(!v){ 
+        document.body.innerHTML = '<div style="color:#fff;padding:12px;font-family:system-ui">Missing video id</div>'; 
+        return; 
+      }
+
+      const autoplay = u.searchParams.get('autoplay') ?? '1';
+      const mute = u.searchParams.get('mute') ?? '1';
+      const controls = u.searchParams.get('controls') ?? '0';
+      const rel = u.searchParams.get('rel') ?? '0';
+      const start = u.searchParams.get('start');
+      const end = u.searchParams.get('end');
+
+      const p = new URLSearchParams();
+      p.set('autoplay', autoplay);
+      p.set('mute', mute);
+      p.set('controls', controls);
+      p.set('rel', rel);
+      p.set('playsinline', '1');
+      p.set('iv_load_policy', '3');
+      p.set('modestbranding', '1');
+      p.set('enablejsapi', '1');
+      p.set('origin', 'http://cef');  // For 153 error
+      if(start) p.set('start', start);
+      if(end) p.set('end', end);
+
+      const src = `https://www.youtube.com/embed/${encodeURIComponent(v)}?${p.toString()}`;
+      const iframe = document.getElementById('yt');
+      iframe.src = src;
+      
+      iframe.onerror = function() {
+        console.error('Failed to load YouTube iframe');
+      };
+    })();
+  </script>
+</body>
+</html>)HTML";
+}
+
+static std::string GetInternalTwitchHtml()
+{
+    return R"HTML(<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="origin">
+  <title>Twitch</title>
+  <style>
+    html,body{margin:0;height:100%;background:#000;overflow:hidden}
+    iframe{border:0;width:100%;height:100%;display:block}
+  </style>
+</head>
+<body>
+  <iframe id="tw"
+    sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-forms"
+    allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+    allowfullscreen
+    referrerpolicy="origin"></iframe>
+
+  <script>
+    (function(){
+      const u = new URL(location.href);
+      const params = new URLSearchParams(u.search);
+
+      const hostname = location.hostname || 'cef';
+      params.set('parent', hostname);
+
+      const channel = params.get('channel');
+      const video = params.get('video');
+      const clip = params.get('clip');
+      
+      if(!channel && !video && !clip){
+        document.body.innerHTML = '<div style="color:#fff;padding:12px;font-family:system-ui">Missing Twitch channel/video/clip</div>';
+        return;
+      }
+
+      let base = 'https://player.twitch.tv/';
+      const finalParams = new URLSearchParams();
+      
+      if(channel) finalParams.set('channel', channel);
+      if(video) finalParams.set('video', video);
+      if(clip) finalParams.set('collection', clip);
+      
+      for(const [k, v] of params.entries()){
+        if(k !== 'channel' && k !== 'video' && k !== 'clip'){
+          finalParams.set(k, v);
+        }
+      }
+      
+      finalParams.set('parent', hostname);
+      finalParams.set('autoplay', 'true');
+      finalParams.set('muted', 'false');
+
+      const src = base + '?' + finalParams.toString();
+      const iframe = document.getElementById('tw');
+      iframe.src = src;
+      
+      iframe.onerror = function() {
+        console.error('Failed to load Twitch iframe');
+      };
+    })();
+  </script>
+</body>
+</html>)HTML";
+}
 
 LocalSchemeHandlerFactory::LocalSchemeHandlerFactory(ResourceManager& resource_manager)
     : resource_manager_(resource_manager)
@@ -266,16 +396,41 @@ bool LocalResourceHandler::ProcessRequest(
     std::string resource_name = path_part.substr(0, first_slash_pos);
     std::string internal_path = path_part.substr(first_slash_pos + 1);
 
-    // Internal embedded page (does NOT depend on VFS / downloaded pak)
+    // Internal embedded pages
     // http://cef/__internal/loading.html
-    if (resource_name == "__internal" && internal_path == "loading.html")
+    // http://cef/__internal/youtube.html?v=...
+    // http://cef/__internal/twitch.html?...
+    if (resource_name == "__internal")
     {
-        const std::string html = GetInternalLoadingHtml();
-        data_.assign(html.begin(), html.end());
-        mime_type_ = "text/html";
-        read_offset_ = 0;
-        callback->Continue();
-        return true;
+        if (internal_path == "loading.html")
+        {
+            const std::string html = GetInternalLoadingHtml();
+            data_.assign(html.begin(), html.end());
+            mime_type_ = "text/html";
+            read_offset_ = 0;
+            callback->Continue();
+            return true;
+        }
+
+        if (internal_path == "youtube.html")
+        {
+            const std::string html = GetInternalYouTubeHtml();
+            data_.assign(html.begin(), html.end());
+            mime_type_ = "text/html";
+            read_offset_ = 0;
+            callback->Continue();
+            return true;
+        }
+
+        if (internal_path == "twitch.html")
+        {
+            const std::string html = GetInternalTwitchHtml();
+            data_.assign(html.begin(), html.end());
+            mime_type_ = "text/html";
+            read_offset_ = 0;
+            callback->Continue();
+            return true;
+        }
     }
 
     // Block files without an extension
