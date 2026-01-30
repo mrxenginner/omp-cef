@@ -44,6 +44,12 @@ target_link_libraries(${PROJECT_NAME}
         ServerCommon
 )
 
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE LINUX)
+endif()
+
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE
         HAVE_STDINT_H=1

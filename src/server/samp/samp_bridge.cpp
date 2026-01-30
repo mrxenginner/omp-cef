@@ -52,7 +52,7 @@ void SampPlatformBridge::CallPawnPublic(const std::string& name, const std::vect
                     cell amx_addr = 0;
                     
                     std::string ansi_string = Utf8ToAnsi(arg.stringValue);
-                    amx_PushString(amx, &amx_addr, NULL, ansi_string.c_str(), NULL, NULL);
+                    amx_PushString(amx, &amx_addr, NULL, ansi_string.c_str(), 0, 0);
 
                     if (!string_pushed) {
                         heap_addr_before_push = amx_addr;
@@ -96,7 +96,7 @@ void SampPlatformBridge::CallOnBrowserCreated(int playerid, int browserId, bool 
 
         cell reason_addr = 0;
 
-        amx_PushString(amx, &reason_addr, NULL, reason.c_str(), NULL, NULL);
+        amx_PushString(amx, &reason_addr, NULL, reason.c_str(), 0, 0);
         amx_Push(amx, code);
         amx_Push(amx, success);
         amx_Push(amx, browserId);
