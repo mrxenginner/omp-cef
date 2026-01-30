@@ -1,10 +1,8 @@
 project(ServerOmp LANGUAGES CXX)
 
 # You can change this path for development
-#set(DLL_DEPLOY_DIR "${CMAKE_SOURCE_DIR}/tests/omp/components")
-set(DLL_DEPLOY_DIR "E:/multiplayer/aurora-mp/rpg/env/components")
-#set(INC_DEPLOY_DIR "${CMAKE_SOURCE_DIR}/tests/omp/qawno/include")
-set(INC_DEPLOY_DIR "E:/multiplayer/aurora-mp/rpg/env/qawno/include")
+set(DLL_DEPLOY_DIR "${CMAKE_SOURCE_DIR}/tests/omp/components")
+set(INC_DEPLOY_DIR "${CMAKE_SOURCE_DIR}/tests/omp/qawno/include")
 
 file(GLOB_RECURSE SERVER_OMP_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
@@ -19,13 +17,9 @@ add_library(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME}
     PRIVATE
-        #${CMAKE_SOURCE_DIR}/deps
         ${CMAKE_SOURCE_DIR}/deps/omp-sdk/include
         ${CMAKE_SOURCE_DIR}/deps/pawn/source
         ${CMAKE_SOURCE_DIR}/deps/pawn/source/linux
-        #${CMAKE_SOURCE_DIR}/deps/pawn-natives
-        # Ajoutez ici le chemin de pawn-natives si différent :
-        # "${CMAKE_SOURCE_DIR}/deps/pawn-natives/include"
 )
 
 target_link_libraries(${PROJECT_NAME}
