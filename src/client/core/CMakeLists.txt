@@ -31,7 +31,7 @@ add_library(${PROJECT_NAME} SHARED ${CLIENT_SRC})
 
 add_win_version_resource(
     ${PROJECT_NAME}
-        VERSION "1.0.0.0"
+        VERSION "1.0.1.0"
         COMPANY "aurora-mp"
         PRODUCT_NAME "CEF Client Plugin"
         FILE_DESC "CEF Client DLL for SA-MP/open.mp"
