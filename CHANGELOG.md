@@ -1,4 +1,27 @@
 
+## [1.0.1](https://github.com/aurora-mp/omp-cef/compare/v1.0.0..v1.0.1) (2026-01-30)
+
+### 🧹 Chore
+
+- Bump version - ([7ee6569](https://github.com/aurora-mp/omp-cef/commit/7ee65699174583053ce099d72bd4e55c82aec6d1))
+- Update README - ([f504958](https://github.com/aurora-mp/omp-cef/commit/f5049585c91a3473a3699d136b7ade0690445440))
+
+### ✨ Features
+
+- Added missing natives ​​(forgotten...) - ([1e53aec](https://github.com/aurora-mp/omp-cef/commit/1e53aec6667db09a2428aaca8b421db9fd24b4a9))
+
+### 🐛 Bug Fixes
+
+- Fix github workflow for binaries in zip - ([f22e35e](https://github.com/aurora-mp/omp-cef/commit/f22e35e167727d6b87d1acd460343e02b5cc7eb2))
+
+### 🔄 Others
+
+- Merge branch 'main' of https://github.com/aurora-mp/omp-cef - ([de1beb2](https://github.com/aurora-mp/omp-cef/commit/de1beb244d9d0f0a1cc2d8a3139092872dc17d15))
+
+
+
+
+
 ## [1.0.0] (2026-01-30)
 
 ### 🧹 Chore
