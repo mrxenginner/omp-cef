@@ -1,0 +1,197 @@
+name: Reusable - Build Server
+
+on:
+  workflow_call:
+    inputs:
+      target: { required: true, type: string } # ServerOmp / ServerSamp
+      arch: { required: true, type: string }  # x86 / x64
+      build-type: { required: true, type: string } # Debug / Release
+
+jobs:
+  build:
+    name: Build ${{ inputs.target }} (${{ inputs.arch }}) on ${{ matrix.os-name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os-name: Windows
+            ext: dll
+          - os: ubuntu-latest
+            os-name: Linux
+            ext: so
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+    steps:
+      - name: Checkout code and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl zip unzip tar
+          sudo apt-get install -y gcc-multilib g++-multilib linux-libc-dev:i386
+
+      - name: Resolve build variables
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Map input target -> option name used in CMake cache vars
+          case "${{ inputs.target }}" in
+            ServerOmp|OMP|Omp|omp)
+              OPTION="OMP"
+              BUILD_TARGET="ServerOmp"
+              ;;
+            ServerSamp|SAMP|Samp|samp)
+              OPTION="SAMP"
+              BUILD_TARGET="ServerSamp"
+              ;;
+            *)
+              echo "Unknown inputs.target='${{ inputs.target }}' (expected ServerOmp/ServerSamp)"
+              exit 1
+              ;;
+          esac
+
+          # Triplet + CMake generator arch flags
+          CMAKE_ARCH=""
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            if [[ "${{ inputs.arch }}" == "x86" ]]; then
+              TRIPLET="x86-windows-static"
+              CMAKE_ARCH="-A Win32"
+            else
+              TRIPLET="x64-windows-static"
+              CMAKE_ARCH="-A x64"
+            fi
+          else
+            if [[ "${{ inputs.arch }}" == "x86" ]]; then
+              TRIPLET="x86-linux"
+            else
+              TRIPLET="x64-linux"
+            fi
+          fi
+
+          echo "option=$OPTION"         >> "$GITHUB_OUTPUT"
+          echo "build_target=$BUILD_TARGET" >> "$GITHUB_OUTPUT"
+          echo "triplet=$TRIPLET"       >> "$GITHUB_OUTPUT"
+          echo "cmake_arch=$CMAKE_ARCH" >> "$GITHUB_OUTPUT"
+
+      - name: Cache vcpkg + installed
+        uses: actions/cache@v4
+        id: cache-vcpkg
+        with:
+          path: |
+            ${{ env.VCPKG_ROOT }}
+            ${{ github.workspace }}/vcpkg_installed
+            ~/.cache/vcpkg/archives
+            C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          key: vcpkg-server-${{ runner.os }}-${{ steps.vars.outputs.triplet }}-${{ inputs.build-type }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Setup vcpkg
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -d "${VCPKG_ROOT}/.git" ]]; then
+            git clone https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}"
+          else
+            if git -C "${VCPKG_ROOT}" rev-parse --is-shallow-repository | grep -q true; then
+              git -C "${VCPKG_ROOT}" fetch --unshallow --prune --tags
+            else
+              git -C "${VCPKG_ROOT}" fetch --prune --tags
+            fi
+          fi
+
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            "${VCPKG_ROOT}/bootstrap-vcpkg.bat"
+          else
+            "${VCPKG_ROOT}/bootstrap-vcpkg.sh"
+          fi
+
+      - name: Prepare 32-bit Linux toolchain (chainload)
+        if: runner.os == 'Linux' && inputs.arch == 'x86'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/cmake"
+          cat > "${GITHUB_WORKSPACE}/cmake/linux-i386-toolchain.cmake" << 'EOF'
+          set(CMAKE_SYSTEM_NAME Linux)
+          set(CMAKE_SYSTEM_PROCESSOR x86)
+
+          set(CMAKE_C_FLAGS   "-m32" CACHE STRING "" FORCE)
+          set(CMAKE_CXX_FLAGS "-m32" CACHE STRING "" FORCE)
+          set(CMAKE_EXE_LINKER_FLAGS    "-m32" CACHE STRING "" FORCE)
+          set(CMAKE_SHARED_LINKER_FLAGS "-m32" CACHE STRING "" FORCE)
+          EOF
+
+      - name: vcpkg install (manifest)
+        shell: bash
+        env:
+          VCPKG_FEATURE_FLAGS: manifests,binarycaching
+        run: |
+          set -euo pipefail
+
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            VCPKG_EXE="${VCPKG_ROOT}/vcpkg.exe"
+          else
+            VCPKG_EXE="${VCPKG_ROOT}/vcpkg"
+          fi
+
+          "${VCPKG_EXE}" install \
+            --triplet "${{ steps.vars.outputs.triplet }}" \
+            --feature-flags=manifests,binarycaching \
+            --x-feature=server
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VCPKG_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          EXTRA_ARGS=""
+
+          if [[ "${RUNNER_OS}" == "Linux" && "${{ inputs.arch }}" == "x86" ]]; then
+            EXTRA_ARGS="-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${GITHUB_WORKSPACE}/cmake/linux-i386-toolchain.cmake"
+          fi
+
+          echo "Resolved target: inputs.target='${{ inputs.target }}' -> option='${{ steps.vars.outputs.option }}' / buildTarget='${{ steps.vars.outputs.build_target }}'"
+
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=${{ inputs.build-type }} \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_TOOLCHAIN_FILE" \
+            -DVCPKG_TARGET_TRIPLET="${{ steps.vars.outputs.triplet }}" \
+            -DVCPKG_FEATURE_FLAGS=manifests\;binarycaching \
+            -DVCPKG_MANIFEST_FEATURES=server \
+            -DDEV_ALL_TARGETS=OFF \
+            -DBUILD_CLIENT=OFF \
+            -DBUILD_SERVER_OMP=OFF \
+            -DBUILD_SERVER_SAMP=OFF \
+            -DBUILD_SERVER_${{ steps.vars.outputs.option }}=ON \
+            $EXTRA_ARGS \
+            ${{ steps.vars.outputs.cmake_arch }}
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Building target: ${{ steps.vars.outputs.build_target }} (config=${{ inputs.build-type }})"
+          cmake --build build --config ${{ inputs.build-type }} --target ${{ steps.vars.outputs.build_target }} --parallel
+
+      - name: Upload Server Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ steps.vars.outputs.build_target }}-${{ inputs.arch }}-${{ matrix.os-name }}
+          path: |
+            build/**/${{ inputs.build-type }}/**/*.${{ matrix.ext }}
+            build/**/*.${{ matrix.ext }}
