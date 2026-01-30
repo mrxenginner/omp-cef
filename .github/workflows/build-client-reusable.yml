@@ -69,7 +69,6 @@ jobs:
 
           BUILD_DIR="build"
           CFG="${{ inputs.build-type }}"
-          TRIPLET="x86-windows-static"
 
           CLIENT_DLL="${BUILD_DIR}/src/client/core/${CFG}/client.dll"
           LOADER_ASI="${BUILD_DIR}/src/client/loader/${CFG}/cef.asi"
@@ -90,18 +89,10 @@ jobs:
           test -f "$CLIENT_DLL" || (echo "Missing $CLIENT_DLL" && exit 1)
           test -f "$LOADER_ASI" || (echo "Missing $LOADER_ASI" && exit 1)
           test -f "$RENDERER_EXE" || (echo "Missing $RENDERER_EXE" && exit 1)
-          test -f "$OPENAL_DLL" || (echo "Missing OpenAL32.dll at $OPENAL_DLL" && exit 1)
 
           cp "$CLIENT_DLL" package/cef/client.dll
           cp "$LOADER_ASI" package/cef.asi
           cp "$RENDERER_EXE" package/cef/renderer.exe
-          cp "$OPENAL_DLL" package/cef/OpenAL32.dll
-          
-          OPENAL_LICENSE="${{ github.workspace }}/vcpkg_installed/${TRIPLET}/share/openal-soft/copyright"
-          if [ -f "$OPENAL_LICENSE" ]; then
-            mkdir -p package/licenses
-            cp "$OPENAL_LICENSE" package/licenses/openal-soft.txt
-          fi
 
       - name: Compress client files
         shell: pwsh
@@ -121,4 +112,3 @@ jobs:
             package/cef/client.dll
             package/cef/renderer.exe
             package/cef.asi
-            package/cef/OpenAL32.dll
