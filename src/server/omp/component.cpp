@@ -4,6 +4,8 @@
 #include <Server/Components/Pawn/Impl/pawn_natives.hpp>
 #include <Server/Components/Pawn/Impl/pawn_impl.hpp>
 
+#include <common/version.hpp>
+
 StringView CefOmpComponent::componentName() const
 {
     return "Cef Component";
@@ -11,7 +13,7 @@ StringView CefOmpComponent::componentName() const
 
 SemanticVersion CefOmpComponent::componentVersion() const
 {
-    return SemanticVersion(1, 0, 0, 0);
+	return { VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_BUILD };
 }
 
 void CefOmpComponent::onLoad(ICore* core)
@@ -40,7 +42,7 @@ void CefOmpComponent::onInit(IComponentList* components)
     auto bridge = CreateOmpPlatformBridge(core_, pawn_);
     plugin_->Initialize(std::move(bridge), cef_network_port_, options);
 
-    LOG_INFO("Component initialized.");
+    LOG_INFO("Component initialized (v%d.%d.%d).", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 }
 
 void CefOmpComponent::onReady() {}

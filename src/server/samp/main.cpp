@@ -6,6 +6,7 @@
 #include <pawn-natives/NativesMain.hpp>
 #include <common/plugin.hpp>
 #include <common/logger.hpp>
+#include <common/version.hpp>
 #include "samp_bridge.hpp"
 #include "config_cfg.hpp"
 
@@ -53,6 +54,8 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void** ppData)
 
     auto bridge = CreateSampPlatformBridge();
     plugin_->Initialize(std::move(bridge), cef_network_port, options);
+
+    LOG_INFO("Plugin loaded (v%d.%d.%d)", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 
     return true;
 }
