@@ -184,7 +184,7 @@ void CefPlugin::HandleRequestJoin(const asio::ip::udp::endpoint& from, const Req
     int playerid = join_packet.playerid;
 
     std::string from_ip = from.address().to_string();
-    std::string official_ip = bridge_->GetPlayerIp(playerid);
+    std::string official_ip = bridge_->GetPlayerAddressIp(playerid);
 
     LOG_INFO("[CEF] RequestJoin pid=%d from=%s:%d official=%s", playerid, from_ip.c_str(), (int)from.port(), official_ip.c_str());
 

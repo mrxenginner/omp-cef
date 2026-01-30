@@ -16,6 +16,6 @@ public:
     virtual void CallPawnPublic(const std::string& name, const std::vector<Argument>& args) = 0;
     virtual void CallOnBrowserCreated(int playerid, int browserId, bool success, int code, const std::string& reason) = 0;
 
-    virtual std::string GetPlayerIp(int playerid) = 0;
+    virtual std::string GetPlayerAddressIp(int playerid) = 0;
     virtual void KickPlayer(int playerid) = 0;
 };

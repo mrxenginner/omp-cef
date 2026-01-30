@@ -1,14 +1,14 @@
 #pragma once
 
-#include <Server/Components/Pawn/pawn.hpp>
 #include "common/bridge.hpp"
+#include <memory>
 
-std::unique_ptr<IPlatformBridge> CreateOmpPlatformBridge(ICore* core, IPawnComponent* pawn);
+std::unique_ptr<IPlatformBridge> CreateSampPlatformBridge();
 
-class OmpPlatformBridge final : public IPlatformBridge
+class SampPlatformBridge final : public IPlatformBridge
 {
 public:
-    OmpPlatformBridge(ICore* core, IPawnComponent* pawn);
+    SampPlatformBridge() = default;
 
     void LogInfo(const std::string& message) override;
     void LogWarn(const std::string& message) override;
@@ -20,8 +20,4 @@ public:
 
     std::string GetPlayerAddressIp(int playerid) override;
     void KickPlayer(int playerid) override;
-
-private:
-    ICore* core_;
-    IPawnComponent* pawn_;
 };

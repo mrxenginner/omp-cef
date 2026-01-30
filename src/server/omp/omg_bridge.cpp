@@ -100,7 +100,7 @@ void OmpPlatformBridge::CallOnBrowserCreated(int playerid, int browserId, bool s
     }
 }
 
-std::string OmpPlatformBridge::GetPlayerIp(int playerid)
+std::string OmpPlatformBridge::GetPlayerAddressIp(int playerid)
 {
     if (core_)
     {

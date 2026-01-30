@@ -47,6 +47,18 @@
         "BUILD_SERVER_OMP": "ON",
         "BUILD_SERVER_SAMP": "OFF"
       }
+    },
+    {
+      "name": "samp-win-x86-debug",
+      "inherits": "win-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_TARGET_TRIPLET": "x86-windows-static",
+        "VCPKG_MANIFEST_FEATURES": "server",
+        "BUILD_CLIENT": "OFF",
+        "BUILD_SERVER_OMP": "OFF",
+        "BUILD_SERVER_SAMP": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -61,6 +73,12 @@
       "configurePreset": "omp-win-x86-debug",
       "configuration": "Debug",
       "targets": ["ServerOmp"]
+    },
+    {
+      "name": "Server Samp x86 (Debug)",
+      "configurePreset": "samp-win-x86-debug",
+      "configuration": "Debug",
+      "targets": ["ServerSamp"]
     }
   ]
 }
