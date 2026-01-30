@@ -1,6 +1,7 @@
 #include "api.hpp"
 #include "plugin.hpp"
 #include "shared/events.hpp"
+#include "natives.hpp"
 
 CefApi* CefApi::instance_ = nullptr;
 
@@ -84,6 +85,32 @@ void CefApi::EmitEvent(int playerid, int browserid, const std::string& name, con
 	plugin_.SendPacketToPlayer(playerid, PacketType::EmitBrowserEvent, event);
 }
 
+void CefApi::ReloadBrowser(int playerid, int browserid, bool ignoreCache)
+{
+	LOG_DEBUG("ReloadBrowser: playerid=%d, browserid=%d", playerid, browserid);
+
+	EmitEventPacket event;
+
+	event.name = CefEvent::Server::ReloadBrowser;
+	event.args.emplace_back(browserid);
+	event.args.emplace_back(ignoreCache);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
+void CefApi::FocusBrowser(int playerid, int browserid, bool focused)
+{
+	LOG_DEBUG("FocusBrowser: playerid=%d, browserid=%d, focused=%d", playerid, browserid, focused);
+
+	EmitEventPacket event;
+
+	event.name = CefEvent::Server::FocusBrowser;
+	event.args.emplace_back(browserid);
+	event.args.emplace_back(focused);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
 void CefApi::AttachBrowserToObject(int playerid, int browserid, int objectId)
 {
 	EmitEventPacket event;
@@ -102,6 +129,71 @@ void CefApi::DetachBrowserFromObject(int playerid, int browserid, int objectid)
 	event.name = CefEvent::Server::DetachBrowserFromObject;
 	event.args.emplace_back(browserid);
 	event.args.emplace_back(objectid);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
+void CefApi::SetBrowserMuted(int playerid, int browserid, bool muted)
+{
+	LOG_DEBUG("SetBrowserMuted: playerid=%d, browserid=%d, muted=%d", playerid, browserid, muted);
+
+	EmitEventPacket event;
+
+	event.name = CefEvent::Server::MuteBrowser;
+	event.args.emplace_back(browserid);
+	event.args.emplace_back(muted);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
+void CefApi::SetBrowserAudioMode(int playerid, int browserid, int mode)
+{
+	if (mode < AUDIO_MODE_WORLD || mode > AUDIO_MODE_UI) {
+		LOG_ERROR("SetAudioMode: Invalid audio mode (%d).", mode);
+		return;
+	}
+
+	EmitEventPacket event;
+
+	event.name = CefEvent::Server::SetAudioMode;
+	event.args.emplace_back(browserid);
+	event.args.emplace_back(mode);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
+void CefApi::SetBrowserAudioSettings(int playerid, int browserid, float maxDistance, float referenceDistance)
+{
+	EmitEventPacket event;
+
+	event.name = CefEvent::Server::SetAudioSettings;
+	event.args.emplace_back(browserid);
+	event.args.emplace_back(maxDistance);
+	event.args.emplace_back(referenceDistance);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
+void CefApi::ToggleHudComponent(int playerid, int componentid, bool toggle)
+{
+	LOG_DEBUG("ToggleHudComponent: playerid=%d, componentid=%d, toggle=%d", playerid, componentid, toggle);
+
+	EmitEventPacket event;
+	event.name = CefEvent::Server::ToggleHudComponent;
+
+	event.args.emplace_back(componentid);
+	event.args.emplace_back(toggle);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
+void CefApi::ToggleSpawnScreen(int playerid, bool toggle)
+{
+	LOG_DEBUG("ToggleSpawnScreen: playerid=%d, toggle=%d", playerid, toggle);
+
+	EmitEventPacket event;
+	event.name = CefEvent::Server::ToggleSpawnScreen;
+	event.args.emplace_back(toggle);
 
 	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
 }

@@ -148,7 +148,7 @@ bool Runtime::Start()
 	download_dialog_ = std::make_unique<DownloadDialog>(network_.get(), hud_.get(), samp_.get(), browser_.get());
 	resources_->SetDownloadDialog(*download_dialog_);
 
-	app_ = std::make_unique<App>(*network_, *browser_, *audio_, *focus_, *resources_);
+	app_ = std::make_unique<App>(*network_, *browser_, *audio_, *focus_, *resources_, *hud_);
 	app_->Initialize();
 
 	return true;

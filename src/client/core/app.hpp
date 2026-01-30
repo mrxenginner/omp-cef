@@ -10,6 +10,7 @@ class BrowserManager;
 class AudioManager;
 class FocusManager;
 class ResourceManager;
+class HudManager;
 
 class App {
 public:
@@ -40,8 +41,9 @@ public:
         BrowserManager& browser,
         AudioManager& audio,
         FocusManager& focus,
-        ResourceManager& resources) noexcept
-        : network_(network), browser_(browser), audio_(audio), focus_(focus), resources_(resources) {}
+        ResourceManager& resources,
+        HudManager& hud) noexcept
+        : network_(network), browser_(browser), audio_(audio), focus_(focus), resources_(resources), hud_(hud) {}
     ~App() = default;
 
     App(const App&) = delete;
@@ -69,6 +71,7 @@ private:
     AudioManager& audio_;
     FocusManager& focus_;
     ResourceManager& resources_;
+    HudManager& hud_;
 
     bool net_endpoint_ready_ = false;
     std::string net_host_;

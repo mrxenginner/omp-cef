@@ -36,51 +36,14 @@ PAWN_NATIVE(Natives, CEF_EmitEvent, void(int playerid, int browserid, const std:
     CefApi::Instance()->EmitEvent(playerid, browserid, eventName, arguments.args);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 PAWN_NATIVE(Natives, CEF_ReloadBrowser, void(int playerid, int browserid, bool ignore_cache))
 {
-    //CefComponent::Instance().ReloadBrowser(playerid, browserid, ignore_cache);
+    CefApi::Instance()->ReloadBrowser(playerid, browserid, ignore_cache);
 }
 
 PAWN_NATIVE(Natives, CEF_FocusBrowser, void(int playerid, int id, bool focused))
 {
-    //CefComponent::Instance().FocusBrowser(playerid, id, focused);
+     CefApi::Instance()->FocusBrowser(playerid, id, focused);
 }
 
 PAWN_NATIVE(Natives, CEF_AttachBrowserToObject, void(int playerid, int browserid, int objectId))
@@ -90,30 +53,30 @@ PAWN_NATIVE(Natives, CEF_AttachBrowserToObject, void(int playerid, int browserid
 
 PAWN_NATIVE(Natives, CEF_DetachBrowserFromObject, void(int playerid, int browserid, int objectId))
 {
-    //CefComponent::Instance().DetachBrowserFromObject(playerid, browserid, objectId);
+    CefApi::Instance()->DetachBrowserFromObject(playerid, browserid, objectId);
 }
 
 PAWN_NATIVE(Natives, CEF_SetBrowserMuted, void(int playerid, int browserid, bool muted))
 {
-    //CefComponent::Instance().SetBrowserMuted(playerid, browserid, muted);
+    CefApi::Instance()->SetBrowserMuted(playerid, browserid, muted);
 }
 
 PAWN_NATIVE(Natives, CEF_SetBrowserAudioMode, void(int playerid, int browserid, int mode))
 {
-    //CefComponent::Instance().SetBrowserAudioMode(playerid, browserid, mode);
+    CefApi::Instance()->SetBrowserAudioMode(playerid, browserid, mode);
 }
 
 PAWN_NATIVE(Natives, CEF_SetBrowserAudioSettings, void(int playerid, int browserid, float maxDistance, float referenceDistance))
 {
-    //CefComponent::Instance().SetBrowserAudioSettings(playerid, browserid, maxDistance, referenceDistance);
+    CefApi::Instance()->SetBrowserAudioSettings(playerid, browserid, maxDistance, referenceDistance);
 }
 
 PAWN_NATIVE(Natives, CEF_ToggleHudComponent, void(int playerid, int componentid, bool toggle))
 {
-    //CefComponent::Instance().ToggleHudComponent(playerid, componentid, toggle);
+    CefApi::Instance()->ToggleHudComponent(playerid, componentid, toggle);
 }
 
 PAWN_NATIVE(Natives, CEF_ToggleSpawnScreen, void(int playerid, bool visible))
 {
-    //CefComponent::Instance().ToggleSpawnScreen(playerid, visible);
+    CefApi::Instance()->ToggleSpawnScreen(playerid, visible);
 }

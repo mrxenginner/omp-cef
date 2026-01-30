@@ -11,6 +11,7 @@
 #include "browser/focus.hpp"
 #include "system/resource_manager.hpp"
 #include "network/network_manager.hpp"
+#include "ui/hud_manager.hpp"
 
 #include "system/logger.hpp"
 #include <samp/components/netgame.hpp>
@@ -281,12 +282,68 @@ void App::OnPacketReceived(const NetworkPacket& packet)
 
                 browser_.DestroyBrowser(id);
             }
+            else if (event.name == CefEvent::Server::ReloadBrowser && event.args.size() >= 2)
+            {
+                int browserId = event.args[0].intValue;
+                bool ignoreCache = event.args[1].boolValue;
+
+                browser_.ReloadBrowser(browserId, ignoreCache);
+            }
+            else if (event.name == CefEvent::Server::FocusBrowser && event.args.size() >= 2) {
+                int browserId = event.args[0].intValue;
+                bool toggle = event.args[1].boolValue;
+
+                browser_.FocusBrowser(browserId, toggle);
+            }
             else if (event.name == CefEvent::Server::AttachBrowserToObject && event.args.size() >= 2)
             {
                 int browserId = event.args[0].intValue;
                 int objectId = event.args[1].intValue;
 
                 browser_.AttachBrowserToObject(browserId, objectId);
+            }
+            else if (event.name == CefEvent::Server::DetachBrowserFromObject && event.args.size() >= 2)
+            {
+                int browserId = event.args[0].intValue;
+                int objectId = event.args[1].intValue;
+
+                browser_.DetachBrowserFromObject(browserId, objectId);
+            }
+            else if (event.name == CefEvent::Server::MuteBrowser && event.args.size() >= 2)
+            {
+                int browserId = event.args[0].intValue;
+                bool muted = event.args[1].boolValue;
+
+                audio_.SetStreamMuted(browserId, muted);
+            }
+            else if (event.name == CefEvent::Server::SetAudioMode && event.args.size() >= 2)
+            {
+                int browserId = event.args[0].intValue;
+                int modeValue = event.args[1].intValue;
+
+                AudioMode mode = static_cast<AudioMode>(modeValue);
+                audio_.SetStreamAudioMode(browserId, mode);
+            }
+            else if (event.name == CefEvent::Server::SetAudioSettings && event.args.size() >= 3)
+            {
+                int browserId = event.args[0].intValue;
+                float maxDistance = event.args[1].floatValue;
+                float refDistance = event.args[2].floatValue;
+
+                audio_.SetStreamAudioSettings(browserId, maxDistance, refDistance);
+            }
+            else if (event.name == CefEvent::Server::ToggleHudComponent && event.args.size() >= 2)
+            {
+                int componentId = event.args[0].intValue;
+                bool toggle = event.args[1].boolValue;
+
+                hud_.ToggleComponent(static_cast<EHudComponent>(componentId), toggle);
+            }
+            else if (event.name == CefEvent::Server::ToggleSpawnScreen && event.args.size() >= 1)
+            {
+                bool toggle = event.args[0].boolValue;
+
+                hud_.SetClassSelectionVisible(toggle);
             }
             break;
         }

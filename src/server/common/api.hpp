@@ -24,14 +24,21 @@ public:
     void DestroyBrowser(int playerid, int browserid);
     void RegisterEvent(const std::string& name, const std::string& callback, const std::vector<ArgumentType>& signature);
     void EmitEvent(int playerid, int browserid, const std::string& name, const std::vector<Argument>& args);
+    void ReloadBrowser(int playerid, int browserid, bool ignoreCache);
+    void FocusBrowser(int playerid, int id, bool focused);
 
     void AttachBrowserToObject(int playerid, int browserid, int objectid);
     void DetachBrowserFromObject(int playerid, int browserid, int objectid);
+
+    void SetBrowserMuted(int playerid, int browserid, bool muted);
+    void SetBrowserAudioMode(int playerid, int browserid, int mode);
+    void SetBrowserAudioSettings(int playerid, int browserid, float maxDistance, float referenceDistance);
+
+    void ToggleHudComponent(int playerid, int componentid, bool toggle);
+    void ToggleSpawnScreen(int playerid, bool toggle);
 
 private:
     CefPlugin& plugin_;
 
     static CefApi* instance_;
-
-    // std::unordered_map<std::string, std::vector<ArgumentType>> registered_events_;
 };
