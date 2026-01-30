@@ -187,3 +187,4 @@ PRs welcome.
 - A first release will coming soon
 - Some *tests* (sample gamemode, resources ... etc)
 - Wiki to explain natives/callbacks
+- Internal loader for youtube video (error 153 from 2025, but you can use *youtube.html* as resource)
