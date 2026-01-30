@@ -10,7 +10,7 @@ function(add_win_version_resource TARGET)
 	cmake_parse_arguments(VER "${options}" "${values}" "" ${ARGN})
 
 	get_target_property(_type ${TARGET} TYPE)
-	if (_type STREQUAL "SHARED_LIBRARY")
+	if (_type STREQUAL "SHARED_LIBRARY" OR _type STREQUAL "MODULE_LIBRARY")
 		set(FILETYPE 2)
 		set(_EXT "dll")
 	elseif (_type STREQUAL "EXECUTABLE")

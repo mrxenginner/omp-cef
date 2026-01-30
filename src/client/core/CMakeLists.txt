@@ -36,7 +36,7 @@ add_win_version_resource(
         PRODUCT_NAME "CEF Client Plugin"
         FILE_DESC "CEF Client DLL for SA-MP/open.mp"
         INTERNAL_NAME "client"
-        COPYRIGHT "Copyright (c) 2025 Aurora Team"
+        COPYRIGHT "Copyright (c) 2026 Aurora Team"
 )
 
 target_include_directories(${PROJECT_NAME}

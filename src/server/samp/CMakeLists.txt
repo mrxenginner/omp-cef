@@ -21,6 +21,16 @@ add_library(${PROJECT_NAME}
         $<$<PLATFORM_ID:Windows>:plugin.def>
 )
 
+add_win_version_resource(
+    ${PROJECT_NAME}
+        VERSION "1.0.0.0"
+        COMPANY "aurora-mp"
+        PRODUCT_NAME "SA-MP Server Plugin"
+        FILE_DESC "CEF Plugin for SA-MP"
+        INTERNAL_NAME "cef"
+        COPYRIGHT "Copyright (C) 2026 Aurora Team"
+)
+
 target_include_directories(${PROJECT_NAME} 
     PRIVATE
         ${CMAKE_SOURCE_DIR}/deps/samp-plugin-sdk
