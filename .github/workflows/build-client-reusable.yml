@@ -69,11 +69,12 @@ jobs:
 
           BUILD_DIR="build"
           CFG="${{ inputs.build-type }}"
+          TRIPLET="x86-windows-static"
 
           CLIENT_DLL="${BUILD_DIR}/src/client/core/${CFG}/client.dll"
           LOADER_ASI="${BUILD_DIR}/src/client/loader/${CFG}/cef.asi"
           RENDERER_EXE="${BUILD_DIR}/src/client/renderer/${CFG}/Renderer.exe"
-          OPENAL_DLL="${{ github.workspace }}/vcpkg_installed/x86-windows-static/bin/OpenAL32.dll"
+          OPENAL_DLL="${{ github.workspace }}/vcpkg_installed/${TRIPLET}/bin/OpenAL32.dll"
 
           rm -rf package && mkdir -p package/cef
 
@@ -101,7 +102,7 @@ jobs:
             mkdir -p package/licenses
             cp "$OPENAL_LICENSE" package/licenses/openal-soft.txt
           fi
-          
+
       - name: Compress client files
         shell: pwsh
         run: Compress-Archive -Path package/* -DestinationPath client-files-v${{ inputs.version }}.zip -Force
