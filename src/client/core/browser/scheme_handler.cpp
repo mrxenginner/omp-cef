@@ -7,6 +7,132 @@
 #include <unordered_map>
 #include <cstring>
 
+static std::string GetInternalLoadingHtml()
+{
+    // Smooth loader page served at: http://cef/__internal/loading.html
+    // Native can call JS functions:
+    //   window.__ompcef.manifest(filesCount, totalBytes)
+    //   window.__ompcef.progress(fileName, fileReceived, fileTotal, overallReceived, overallTotal)
+    //   window.__ompcef.done()
+
+    return R"HTML(<!doctype html>
+        <html>
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <title>Downloading resources UI</title>
+                <style>
+                    html,body{margin:0;height:100%;font-family:system-ui,Segoe UI,Roboto,Arial;background:transparent;color:#e7eefc}
+                    .wrap{height:100%;display:flex;align-items:center;justify-content:center}
+                    .card{width:min(560px,92vw);padding:18px 18px 14px;border-radius:16px;background:#1a1a1a;box-shadow:0 10px 40px rgba(0,0,0,.35);backdrop-filter:blur(10px)}
+                    .title{font-size:18px;font-weight:700;margin:0 0 10px}
+                    .sub{opacity:.75;font-size:13px;margin:0 0 14px}
+                    .bar{height:12px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+                    .fill{height:100%;width:0%;background:linear-gradient(90deg,#63e,#3cf)}
+                    .row{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:12px;opacity:.85}
+                    .file{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%}
+                </style>
+            </head>
+
+            <body>
+                <div class="wrap">
+                    <div class="card">
+                        <p class="title">Downloading ressources ...</p>
+                        <p class="sub" id="sub">Loading ...</p>
+
+                        <div class="bar">
+                            <div class="fill" id="fill"></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="file" id="file">-</div>
+                            <div id="pct">0%</div>
+                        </div>
+
+                        <div class="row">
+                            <div id="speed">0 KB/s</div>
+                            <!--<div id="eta">—</div>-->
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    const elFill = document.getElementById('fill');
+                    const elPct = document.getElementById('pct');
+                    const elSub = document.getElementById('sub');
+                    const elFile = document.getElementById('file');
+                    const elSpeed = document.getElementById('speed');
+                    const elEta = document.getElementById('eta');
+
+                    let total = 0, got = 0;
+                    let targetPct = 0;
+                    let smoothPct = 0;
+
+                    let lastT = performance.now(), lastGot = 0;
+
+                    function fmtBytes(n) {
+                        const u=["B","KB","MB","GB"]; let i=0;
+                        while(n>=1024 && i<u.length-1){n/=1024;i++;}
+                        return `${n.toFixed(i?2:0)} ${u[i]}`;
+                    }
+
+                    function tickSpeed(){
+                        const now = performance.now();
+                        const dt = (now-lastT)/1000;
+                        if(dt <= 0.10) return;
+                        const dGot = got-lastGot;
+                        const sp = dGot/dt;
+                        elSpeed.textContent = `${fmtBytes(sp)}/s`;
+                        
+                        if(total>0 && sp>1){
+                            const rem = Math.max(0,total-got);
+                            const eta = rem/sp;
+                            const m = Math.floor(eta/60), s = Math.floor(eta%60);
+                            elEta.textContent = `${m}m ${s}s`;
+                        }
+
+                        lastT = now; lastGot = got;
+                    }
+
+                    setInterval(tickSpeed, 200);
+
+                    function raf(){
+                        smoothPct += (targetPct - smoothPct) * 0.15;
+                        const pct = Math.max(0, Math.min(100, smoothPct));
+                        elFill.style.width = pct.toFixed(2) + '%';
+                        elPct.textContent = Math.round(pct) + '%';
+                        requestAnimationFrame(raf);
+                    }
+
+                    requestAnimationFrame(raf);
+
+                    window.__ompcef = {
+                        manifest: (files, bytes) => {
+                        total = bytes|0;
+                        elSub.textContent = `${files} fichier(s) • ${fmtBytes(total)}`;
+                    },
+                    progress: (fileName, fileReceived, fileTotal, overallReceived, overallTotal) => {
+                        got = overallReceived|0;
+                        total = overallTotal|0;
+                        targetPct = total ? (got/total)*100 : 0;
+
+                        elFile.textContent = fileName || '—';
+                        elSub.textContent = `${fmtBytes(fileReceived)} / ${fmtBytes(fileTotal)} • Total ${fmtBytes(got)} / ${fmtBytes(total)}`;
+                    },
+                    done: () => {
+                        got = total;
+                        targetPct = 100;
+                            elFile.textContent = 'Done';
+                            elSub.textContent = 'Loading ...';
+                            elEta.textContent = '—';
+                        }
+                    };
+                </script>
+            </body>
+        </html>)HTML";
+}
+
+
 LocalSchemeHandlerFactory::LocalSchemeHandlerFactory(ResourceManager& resource_manager)
     : resource_manager_(resource_manager)
 {
@@ -95,8 +221,8 @@ std::string GetMimeType(const std::string& path)
     return "application/octet-stream";
 }
 
-LocalResourceHandler::LocalResourceHandler(ResourceManager& resource_manager) 
-    : resource_manager_(resource_manager), read_offset_(0) 
+LocalResourceHandler::LocalResourceHandler(ResourceManager& resource_manager)
+    : resource_manager_(resource_manager), read_offset_(0)
 {
 }
 
@@ -108,7 +234,7 @@ bool LocalResourceHandler::ProcessRequest(
 
     std::string url = request->GetURL();
     std::string path_part;
-    
+
     if (url.rfind("cef://", 0) == 0) {
         path_part = url.substr(6);
     }
@@ -140,6 +266,18 @@ bool LocalResourceHandler::ProcessRequest(
     std::string resource_name = path_part.substr(0, first_slash_pos);
     std::string internal_path = path_part.substr(first_slash_pos + 1);
 
+    // Internal embedded page (does NOT depend on VFS / downloaded pak)
+    // http://cef/__internal/loading.html
+    if (resource_name == "__internal" && internal_path == "loading.html")
+    {
+        const std::string html = GetInternalLoadingHtml();
+        data_.assign(html.begin(), html.end());
+        mime_type_ = "text/html";
+        read_offset_ = 0;
+        callback->Continue();
+        return true;
+    }
+
     // Block files without an extension
     size_t pos = internal_path.rfind('.');
     if (pos == std::string::npos) {
@@ -148,21 +286,21 @@ bool LocalResourceHandler::ProcessRequest(
     }
 
     std::string ext = internal_path.substr(pos);
-    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { 
-        return std::tolower(c); 
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
+        return std::tolower(c);
     });
 
     // Block the request if the extension is not in the allowed types.
     const auto& mime_map = GetMimeTypeMap();
     if (mime_map.find(ext) == mime_map.end()) {
         LOG_WARN("[CEF] Blocked request for unallowed file type ({}): {}", ext, internal_path);
-        return false; 
+        return false;
     }
 
     // URL decode the path (handle spaces and special characters)
     CefString decoded = CefURIDecode(
-        internal_path, 
-        true, 
+        internal_path,
+        true,
         static_cast<cef_uri_unescape_rule_t>(UU_SPACES | UU_URL_SPECIAL_CHARS_EXCEPT_PATH_SEPARATORS)
     );
 

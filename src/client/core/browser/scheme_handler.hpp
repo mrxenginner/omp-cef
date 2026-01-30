@@ -2,7 +2,10 @@
 
 #include "include/cef_resource_handler.h"
 #include "include/cef_scheme.h"
+
 #include <cstdint>
+#include <string>
+#include <vector>
 
 class ResourceManager;
 
@@ -22,7 +25,7 @@ private:
 
     std::vector<uint8_t> data_;
     std::string mime_type_;
-    size_t read_offset_;
+    size_t read_offset_ = 0;
 
     IMPLEMENT_REFCOUNTING(LocalResourceHandler);
 };

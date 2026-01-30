@@ -69,10 +69,9 @@ void ResourceManager::OnManifestReceived(const std::string& manifestJson)
 
 void ResourceManager::MarkAsReadyToDownload()
 {
-	LOG_INFO("ResourceManager::MarkAsReadyToDownload()");
 	DownloadState expected = DownloadState::IDLE;
 	if (state_.compare_exchange_strong(expected, DownloadState::AWAITING_TRIGGER)) {
-		LOG_INFO("[ResourceManager] Ready to download");
+		LOG_INFO("[ResourceManager] Ready to download.");
 	}
 }
 
@@ -114,36 +113,36 @@ void ResourceManager::TriggerDownload()
             size_t server_size = file_entry["size"];
             std::string local_path = server_cache_path_ + path;
 
-            LOG_INFO("[Cache Check] File: {}", path);
-            LOG_INFO("[Cache Check]   Local path: {}", local_path);
-            LOG_INFO("[Cache Check]   Expected hash: {}", server_hash);
-            LOG_INFO("[Cache Check]   Expected size: {}", server_size);
+            //LOG_INFO("[Cache Check] File: {}", path);
+            //LOG_INFO("[Cache Check]   Local path: {}", local_path);
+            //LOG_INFO("[Cache Check]   Expected hash: {}", server_hash);
+            //LOG_INFO("[Cache Check]   Expected size: {}", server_size);
             
             bool file_exists = std::filesystem::exists(local_path);
-            LOG_INFO("[Cache Check]   File exists: {}", file_exists);
+            //LOG_INFO("[Cache Check]   File exists: {}", file_exists);
             
             if (file_exists) {
                 size_t actual_size = std::filesystem::file_size(local_path);
-                LOG_INFO("[Cache Check]   Actual size: {}", actual_size);
+                //LOG_INFO("[Cache Check]   Actual size: {}", actual_size);
                 
-                LOG_INFO("[Cache Check]   Computing hash...");
+                //LOG_INFO("[Cache Check]   Computing hash...");
                 std::string local_hash = CalculateSHA256(local_path);
-                LOG_INFO("[Cache Check]   Actual hash: {}", local_hash);
+                //LOG_INFO("[Cache Check]   Actual hash: {}", local_hash);
                 
                 if (local_hash == server_hash) {
-                    LOG_INFO("[Cache Check]   ✓ Hash MATCH! Loading from cache...");
+                    //LOG_INFO("[Cache Check] Hash MATCH! Loading from cache...");
                     
                     if (LoadPakIntoVFS(resourceName, local_path)) {
-                        LOG_INFO("[Cache Check]   ✓ Successfully loaded into VFS");
+                        //LOG_INFO("[Cache Check] Successfully loaded into VFS");
                         continue;
                     } else {
-                        LOG_ERROR("[Cache Check]   ✗ Failed to load into VFS, will re-download");
+                        //LOG_ERROR("[Cache Check]   ✗ Failed to load into VFS, will re-download");
                     }
                 } else {
-                    LOG_WARN("[Cache Check]   ✗ Hash MISMATCH! Will re-download");
+                    //LOG_WARN("[Cache Check]   ✗ Hash MISMATCH! Will re-download");
                 }
             } else {
-                LOG_INFO("[Cache Check]   ✗ File not found, will download");
+                //LOG_INFO("[Cache Check]   ✗ File not found, will download");
             }
 
             files_to_request.push_back({ resourceName, path });
@@ -167,9 +166,9 @@ void ResourceManager::TriggerDownload()
 			dialog_files.emplace_back(p.fileName, p.totalSize);
 		}
 
-		LOG_INFO("[Download] Starting download for {} file(s):", download_progress_.size());
+		LOG_INFO("[ResourceManager] Starting download for {} file(s):", download_progress_.size());
 		for (const auto& p : download_progress_) {
-			LOG_INFO("[Download]   - {} ({})", p.fileName.c_str(), FormatBytes(p.totalSize).c_str());
+			//LOG_INFO("[Download]   - {} ({})", p.fileName.c_str(), FormatBytes(p.totalSize).c_str());
 		}
 
 		download_dialog_->Start(dialog_files);
@@ -204,21 +203,18 @@ void ResourceManager::OnFileData(const FileDataPacket& packet)
 		assembly.totalChunks = packet.totalChunks;
 		assembly.chunks.resize(packet.totalChunks);
 
-		LOG_INFO("[Download] Starting assembly for '{}' ({} chunks)",
-			packet.relativePath, packet.totalChunks);
+		//LOG_INFO("[Download] Starting assembly for '{}' ({} chunks)", packet.relativePath, packet.totalChunks);
 	}
 
 	if (packet.totalChunks != assembly.totalChunks)
 	{
-		LOG_ERROR("[Download] Chunk count mismatch for '{}': expected {}, got {}",
-			packet.relativePath, assembly.totalChunks, packet.totalChunks);
+		LOG_ERROR("[ResourceManager] Chunk count mismatch for '{}': expected {}, got {}", packet.relativePath, assembly.totalChunks, packet.totalChunks);
 		return;
 	}
 
 	if (packet.chunkIndex >= assembly.totalChunks)
 	{
-		LOG_ERROR("[Download] Invalid chunk index {} for '{}'",
-			packet.chunkIndex, packet.relativePath);
+		LOG_ERROR("[ResourceManager] Invalid chunk index {} for '{}'", packet.chunkIndex, packet.relativePath);
 		return;
 	}
 
@@ -236,33 +232,21 @@ void ResourceManager::OnFileData(const FileDataPacket& packet)
 					? static_cast<int>((static_cast<double>(progress.bytesReceived) / progress.totalSize) * 100.0)
 					: 100;
 				
-				LOG_INFO("[Download] {} - {} / {} ({}%) | chunk {}/{}",
-					progress.fileName.c_str(),
-					FormatBytes(progress.bytesReceived).c_str(),
-					FormatBytes(progress.totalSize).c_str(),
-					percentage,
-					assembly.receivedChunks, assembly.totalChunks);
-
 				download_dialog_->Update(static_cast<uint32_t>(i), download_progress_[i].bytesReceived);
 			}
 		}
-
-		// DownloadDialog::Update(net_, static_cast<uint32_t>(i), download_progress_[i].bytesReceived);
-
-		/*LOG_DEBUG("[Download] Received chunk {}/{} for '{}'",
-			assembly.receivedChunks, assembly.totalChunks, packet.relativePath);*/
 	}
 
 	if (assembly.receivedChunks == assembly.totalChunks)
 	{
-		LOG_INFO("[Download] All chunks received for '{}', assembling...", packet.relativePath);
+		LOG_INFO("[ResourceManager] All chunks received for '{}', assembling...", packet.relativePath);
 
-		// Assembler tous les chunks
 		std::vector<uint8_t> completeFile;
 		size_t totalSize = 0;
 		for (const auto& chunk : assembly.chunks) {
 			totalSize += chunk.size();
 		}
+
 		completeFile.reserve(totalSize);
 
 		for (const auto& chunk : assembly.chunks) {
@@ -272,8 +256,7 @@ void ResourceManager::OnFileData(const FileDataPacket& packet)
 		std::string receivedHash = CalculateSHA256FromData(completeFile);
 		if (receivedHash != packet.fileHash)
 		{
-			LOG_ERROR("[Download] Hash mismatch for '{}': expected {}, got {}",
-				packet.relativePath, packet.fileHash, receivedHash);
+			LOG_ERROR("[ResourceManager] Hash mismatch for '{}': expected {}, got {}", packet.relativePath, packet.fileHash, receivedHash);
 
 			assembling_files_.erase(fileKey);
 
@@ -295,8 +278,7 @@ void ResourceManager::OnFileData(const FileDataPacket& packet)
 			outFile.write(reinterpret_cast<const char*>(completeFile.data()), completeFile.size());
 			outFile.close();
 
-			LOG_INFO("[Download] File '{}' saved successfully ({} bytes)",
-				packet.relativePath, completeFile.size());
+			LOG_INFO("[ResourceManager] File '{}' saved successfully ({} bytes)", packet.relativePath, completeFile.size());
 
 			if (LoadPakIntoVFS(packet.resourceName, savePath))
 			{
@@ -327,12 +309,13 @@ void ResourceManager::OnFileData(const FileDataPacket& packet)
 			if (allComplete)
 			{
 				LOG_INFO("[ResourceManager] All downloads complete!");
+
 				state_ = DownloadState::COMPLETED;
 				download_dialog_->Finish();
 			}
 		}
 		catch (const std::exception& e) {
-			LOG_ERROR("[Download] Failed to save file '{}': {}", packet.relativePath, e.what());
+			LOG_ERROR("[ResourceManager] Failed to save file '{}': {}", packet.relativePath, e.what());
 		}
 	}
 }

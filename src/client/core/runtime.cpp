@@ -47,7 +47,8 @@ bool Runtime::Start()
 	(void)config_->Load(kConfigPath);
 
 	logger_->SetLogFile(kClientLog);
-	logger_->SetDebugMode(config_->Get<bool>("debug", false));
+	// logger_->SetDebugMode(config_->Get<bool>("debug", false));
+	logger_->SetDebugMode(true);
 
 	gta_->Initialize();
 	hud_->Initialize();
@@ -144,7 +145,7 @@ bool Runtime::Start()
 	netgame_hook_ = std::make_unique<NetGameHook>(*hooks_, *resources_);
 	netgame_hook_->Initialize();
 
-	download_dialog_ = std::make_unique<DownloadDialog>(network_.get(), hud_.get(), samp_.get());
+	download_dialog_ = std::make_unique<DownloadDialog>(network_.get(), hud_.get(), samp_.get(), browser_.get());
 	resources_->SetDownloadDialog(*download_dialog_);
 
 	app_ = std::make_unique<App>(*network_, *browser_, *audio_, *focus_, *resources_);
