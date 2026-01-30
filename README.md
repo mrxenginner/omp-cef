@@ -7,6 +7,9 @@
 > Network convention : **CEF UDP = server_port + 2**  
 > Example: server `:7777` -> CEF (Network) `:7779`
 
+---
+
+### Current CEF version: 143.0.14+gdd46a37+chromium-143.0.7499.193
 
 ## Features
 
