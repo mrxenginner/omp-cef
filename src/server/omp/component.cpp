@@ -35,11 +35,12 @@ void CefOmpComponent::onInit(IComponentList* components)
 
     CefPluginOptions options;
     options.log_level = debug_enabled_ ? CefLogLevel::Debug : CefLogLevel::Info;
+    options.master_resource_key = master_resource_key_;
 
     auto bridge = CreateOmpPlatformBridge(core_, pawn_);
     plugin_->Initialize(std::move(bridge), cef_network_port_, options);
 
-    LOG_INFO("Component initialized");
+    LOG_INFO("Component initialized.");
 }
 
 void CefOmpComponent::onReady() {}
@@ -50,8 +51,6 @@ void CefOmpComponent::onFree(IComponent* component)
     {
         pawn_ = nullptr;
     }
-
-    // TODO: plugin_->Exit()
 }
 
 void CefOmpComponent::provideConfiguration(ILogger& logger, IEarlyConfig& config, bool defaults) 
@@ -84,7 +83,6 @@ void CefOmpComponent::provideConfiguration(ILogger& logger, IEarlyConfig& config
 	if (key_len == 16 || key_len == 24 || key_len == 32) {
 		master_resource_key_.assign(key_sv.data(), key_sv.data() + key_len);
 		logger.printLn("[CEF Security] Master resource key loaded successfully (%zu bytes, for AES-%zu).", key_len, key_len * 8);
-		logger.logLn(Debug, "[CEF Security] TEST");
 	}
 	else {
 		logger.printLn("===================================================================");

@@ -40,7 +40,7 @@ struct NetworkSession
 	HandshakeStatus handshake_status = HandshakeStatus::NONE;
 	bool handshake_complete = false;
 	bool cef_init_notified = false;
-	bool cef_ok = false;
+	bool cef_success = false;
 
 	std::vector<uint8_t> rx_key;
 	std::vector<uint8_t> tx_key;

@@ -150,8 +150,12 @@ void DownloadDialog::Finish()
 
     // Let user see 100% shortly, then hide
     CefPostDelayedTask(TID_UI,
-        base::BindOnce([](DownloadDialog* self) { self->HideLoader(); }, base::Unretained(this)),
+        base::BindOnce([](DownloadDialog* self) { 
+            self->HideLoader(); 
+        }, base::Unretained(this)),
         700);
+
+    network_->SendPacket(PacketType::DownloadComplete, {});
 
     LOG_INFO("[DownloadDialog] Finished.");
 }

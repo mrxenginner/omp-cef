@@ -44,12 +44,11 @@ public:
 	void HandleFileRequest(int playerid, const RequestFilesPacket& request);
 	void ProcessFileTransfers();
 
-	void PauseDownload(int playerid, bool pause);
-
 	void SendRawPacketToEndpoint(const asio::ip::udp::endpoint& endpoint, PacketType type, const PacketPayload& payload);
 	void SendPacketToPlayer(int playerid, PacketType type, const PacketPayload& payload);
 
-	void NotifyCefInitialize(std::shared_ptr<NetworkSession> session, bool ok);
+	void NotifyCefInitialize(std::shared_ptr<NetworkSession> session, bool success);
+	void NotifyCefReady(std::shared_ptr<NetworkSession> session);
 	void HandleClientEvent(int playerid, const ClientEmitEventPacket& payload);
 	void RegisterEvent(const std::string& name, const std::string& callback, const std::vector<ArgumentType>& signature);
 

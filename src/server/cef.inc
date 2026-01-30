@@ -266,6 +266,15 @@ native CEF_ToggleSpawnScreen(playerid, bool:toggle);
 forward OnCefInitialize(playerid, bool:success);
 
 /**
+ * Called when a player's CEF client is fully ready (ressources downloaded ... etc)
+ *
+ * Useful when you want to start emit events (like for showing a login screen ...)
+ *
+ * @param playerid      The ID of the player.
+*/
+forward OnCefReady(playerid);
+
+/**
  * Called when a browser creation request is processed by the client.
  *
  * This callback is the unified response for any browser creation attempt.
