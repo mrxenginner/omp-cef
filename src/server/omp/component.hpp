@@ -10,8 +10,7 @@ struct ICefOmpComponent : IComponent
 
 class CefOmpComponent final : public ICefOmpComponent,
                               public PawnEventHandler,
-                              public PlayerConnectEventHandler,
-                              public PlayerDialogEventHandler
+                              public PlayerConnectEventHandler
 {
 public:
     StringView componentName() const override;
@@ -33,7 +32,9 @@ public:
     void onPlayerConnect(IPlayer& player) override;
     void onPlayerClientInit(IPlayer& player) override;
     void onPlayerDisconnect(IPlayer& player, PeerDisconnectReason reason) override;
-    void onDialogResponse(IPlayer& player, int dialogId, DialogResponse response, int listItem, StringView inputText) override;
+
+private:
+    static constexpr uint16_t cef_network_port_offset = 2;
 
 private:
     ICore* core_ = nullptr;
@@ -42,6 +43,8 @@ private:
     std::unique_ptr<CefPlugin> plugin_;
 
     bool debug_enabled_ = false;
-    uint16_t http_port_ = 7780;
     std::vector<uint8_t> master_resource_key_;
+
+    uint16_t server_port_ = 7777;
+    uint16_t cef_network_port_ = 7779;
 };

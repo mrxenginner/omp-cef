@@ -24,9 +24,7 @@ void CefOmpComponent::onLoad(ICore* core)
 void CefOmpComponent::onInit(IComponentList* components)
 {
     plugin_ = std::make_unique<CefPlugin>();
-
     pawn_ = components->queryComponent<IPawnComponent>();
-    auto dialogs = components->queryComponent<IDialogsComponent>();
 
     if (pawn_)
     {
@@ -35,15 +33,13 @@ void CefOmpComponent::onInit(IComponentList* components)
         pawn_->getEventDispatcher().addEventHandler(this);
     }
 
-    if (dialogs)
-    {
-        dialogs->getEventDispatcher().addEventHandler(this);
-    }
+    CefPluginOptions options;
+    options.log_level = debug_enabled_ ? CefLogLevel::Debug : CefLogLevel::Info;
 
     auto bridge = CreateOmpPlatformBridge(core_, pawn_);
-    plugin_->Initialize(std::move(bridge), master_resource_key_);
+    plugin_->Initialize(std::move(bridge), cef_network_port_, options);
 
-    LOG_INFO("Component initialized.");
+    LOG_INFO("Component initialized");
 }
 
 void CefOmpComponent::onReady() {}
@@ -60,34 +56,27 @@ void CefOmpComponent::onFree(IComponent* component)
 
 void CefOmpComponent::provideConfiguration(ILogger& logger, IEarlyConfig& config, bool defaults) 
 {
+    int* port_ptr = config.getInt("network.port");
+    const int port_value = (port_ptr && *port_ptr > 0 && *port_ptr <= 65535) ? *port_ptr : 7777;
+    
+    server_port_ = static_cast<uint16_t>(port_value);
+    cef_network_port_ = static_cast<uint16_t>(port_value + 2);
+
 	if (defaults) {
 		config.setBool("cef.debug", false);
-		//config.setInt("cef.http_port", 7780); // TODO
-		//config.setInt("cef.resource_dialog_id", 1); // TODO
-		config.setString("cef.master_resource_key", "ThisIsA16ByteKey"); // TODO
+		config.setString("cef.master_resource_key", "ThisIsA16ByteKey");
 	}
 	else {
 		if (config.getType("cef.debug") == ConfigOptionType_None) {
 			config.setBool("cef.debug", false);
 		}
 
-		/*if (config.getType("cef.http_port") == ConfigOptionType_None) {
-			config.setInt("cef.http_port", 7780);
-		}*/
-
 		if (config.getType("cef.master_resource_key") == ConfigOptionType_None) {
 			config.setString("cef.master_resource_key", "ThisIsA16ByteKey");
 		}
 	}
 
-	debug_enabled_ = config.getBool("cef.debug");
-	/*int* http_port_ptr = config.getInt("cef.http_port");
-	if (http_port_ptr != nullptr) {
-		http_port_ = static_cast<uint16_t>(*http_port_ptr);
-	}
-	else {
-		http_port_ = 7780;
-	}*/
+	debug_enabled_ = config.getBool("cef.debug") ? *config.getBool("cef.debug") : false;
 
 	StringView key_sv = config.getString("cef.master_resource_key");
 	size_t key_len = key_sv.length();
@@ -95,6 +84,7 @@ void CefOmpComponent::provideConfiguration(ILogger& logger, IEarlyConfig& config
 	if (key_len == 16 || key_len == 24 || key_len == 32) {
 		master_resource_key_.assign(key_sv.data(), key_sv.data() + key_len);
 		logger.printLn("[CEF Security] Master resource key loaded successfully (%zu bytes, for AES-%zu).", key_len, key_len * 8);
+		logger.logLn(Debug, "[CEF Security] TEST");
 	}
 	else {
 		logger.printLn("===================================================================");
@@ -135,16 +125,6 @@ void CefOmpComponent::onPlayerClientInit(IPlayer& player)
 void CefOmpComponent::onPlayerDisconnect(IPlayer& player, PeerDisconnectReason reason) 
 {
 	plugin_->OnPlayerDisconnect(player.getID());
-}
-
-void CefOmpComponent::onDialogResponse(IPlayer& player, int dialogId, DialogResponse response, int listItem, StringView inputText)
-{
-	plugin_->OnDialogResponse(player.getID(),
-		dialogId,
-		(response == DialogResponse_Left ? 1 : 0),
-		listItem,
-		std::string(inputText)
-	);
 }
 
 CefOmpComponent::~CefOmpComponent()

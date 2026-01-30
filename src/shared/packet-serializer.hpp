@@ -133,7 +133,7 @@ inline bool SerializePacket(const NetworkPacket& packet, std::string& out)
 				os.write(reinterpret_cast<const char*>(&arg.totalChunks), sizeof(arg.totalChunks));
 				WriteBytes(os, arg.data);
 			}
-			else if constexpr (std::is_same_v<T, DownloadStartedPacket>) {
+			/*else if constexpr (std::is_same_v<T, DownloadStartedPacket>) {
 				uint16_t count = static_cast<uint16_t>(arg.files_to_download.size());
 				os.write(reinterpret_cast<const char*>(&count), sizeof(count));
 
@@ -144,7 +144,7 @@ inline bool SerializePacket(const NetworkPacket& packet, std::string& out)
 			}
 			else if constexpr (std::is_same_v<T, DownloadProgressPacket>) {
 				os.write(reinterpret_cast<const char*>(&arg), sizeof(arg));
-			}
+			}*/
 			else if constexpr (std::is_same_v<T, EmitEventPacket> || std::is_same_v<T, ClientEmitEventPacket>) {
 				os.write(reinterpret_cast<const char*>(&arg.browserId), sizeof(arg.browserId));
 				WriteString(os, arg.name);
@@ -314,7 +314,7 @@ inline bool DeserializePacket(const char* data, size_t size, NetworkPacket& out)
 			out.payload = packet;
 			break;
 		}
-		case PacketType::DownloadStarted: {
+		/*case PacketType::DownloadStarted: {
 			DownloadStartedPacket packet{};
 
 			uint16_t count;
@@ -349,7 +349,7 @@ inline bool DeserializePacket(const char* data, size_t size, NetworkPacket& out)
 
 			out.payload = packet;
 			break;
-		}
+		}*/
 		case PacketType::EmitEvent:
 		case PacketType::EmitBrowserEvent:
 		case PacketType::ClientEmitEvent: {

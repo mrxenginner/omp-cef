@@ -18,7 +18,4 @@ public:
 
     virtual std::string GetPlayerIp(int playerid) = 0;
     virtual void KickPlayer(int playerid) = 0;
-
-    virtual void ShowDialog(int playerid, int dialogid, int style, const std::string& title, const std::string& body, const std::string& button1, const std::string& button2) = 0;
-    virtual void HideDialog(int playerid) = 0;
 };

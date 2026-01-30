@@ -15,28 +15,28 @@ CefPlugin::CefPlugin()
 	sessions_ = std::make_unique<NetworkSessionManager>();
 	api_ = std::make_unique<CefApi>(*this);
 	resource_ = std::make_unique<ResourceManager>();
-	resource_dialog_ = std::make_unique<ResourceDialog>(*this);
 }
 
-void CefPlugin::Initialize(std::unique_ptr<IPlatformBridge> bridge, std::vector<uint8_t> master_resource_key)
+void CefPlugin::Initialize(std::unique_ptr<IPlatformBridge> bridge, uint16_t listen_port, const CefPluginOptions& options)
 {
 	if (running_)
 		return;
 
 	bridge_ = std::move(bridge);
-	master_resource_key_ = master_resource_key;
+	master_resource_key_ = options.master_resource_key;
 
 	logger_.SetBridge(bridge_.get());
-	logger_.SetLevel(CefLogLevel::Debug); // TODO: debug_enabled
+	logger_.SetLevel(options.log_level);
 	logging::SetLogger(&logger_);
 
 	security_->Initialize(io_context_);
-	resource_dialog_->Initialize(bridge_.get());
+
+    const uint16_t port = (listen_port != 0 ? listen_port : static_cast<uint16_t>(7779));
 
 	try
 	{
 		network_server_ = std::make_unique<NetworkServer>(
-			7779,
+			port,
 			io_context_,
 			[this](const asio::ip::udp::endpoint& from, const char* data, int len)
 			{ 
@@ -67,7 +67,7 @@ void CefPlugin::Initialize(std::unique_ptr<IPlatformBridge> bridge, std::vector<
 
 		running_ = true;
 
-		LOG_INFO("Network Server started successfully on port %d.", 7779);
+		LOG_INFO("Network Server started successfully on port %d.", (int)port);
 	}
 	catch (const std::exception& e)
 	{
@@ -105,7 +105,6 @@ void CefPlugin::Shutdown()
     sessions_.reset();
     api_.reset();
     resource_.reset();
-    resource_dialog_.reset();
 
     logging::SetLogger(nullptr);
     bridge_.reset();
@@ -113,22 +112,30 @@ void CefPlugin::Shutdown()
 
 void CefPlugin::OnPlayerConnect(int playerid)
 {
+    LOG_INFO("[CefPlugin] OnPlayerConnect called for player %d.", playerid);
 	sessions_->RegisterPlayer(playerid);
 }
 
 void CefPlugin::OnPlayerClientInit(int playerid)
 {
+    LOG_INFO("[CefPlugin] OnPlayerClientInit called for player %d.", playerid);
+
 	auto session = sessions_->GetSession(playerid);
 	if (session && session->handshake_complete) {
-		LOG_INFO("[SERVER] Player %d connected, CEF handshake complete.", playerid);
+		LOG_INFO("[CefPlugin] Player %d connected, CEF handshake complete.", playerid);
 		NotifyCefInitialize(session, true);
 		return;
 	}
 
+    LOG_INFO("[CefPlugin] 1 OnPlayerClientInit called for player %d.", playerid);
+
 	auto timer = std::make_shared<asio::steady_timer>(io_context_);
     timer->expires_after(std::chrono::seconds(10));
     timer->async_wait([this, playerid, timer](const std::error_code& error_code) {
-        if (error_code || !running_) return;
+        if (error_code || !running_) {
+            LOG_INFO("[CefPlugin] 2 OnPlayerClientInit called for player %d.", playerid);
+            return;
+        }
 
         auto session = sessions_->GetSession(playerid);
         if (!session) return;
@@ -144,14 +151,6 @@ void CefPlugin::OnPlayerDisconnect(int playerid)
 	sessions_->RemovePlayer(playerid);
 }
 
-void CefPlugin::OnDialogResponse(int playerid, int dialogid, int response, int listitem, const std::string& inputtext) 
-{
-	if (dialogid == 32767) // TODO
-	{
-		resource_dialog_->OnDialogResponse(playerid, response);
-	}
-}
-
 void CefPlugin::OnPacketReceived(const asio::ip::udp::endpoint& from, const char* data, int len)
 {
 	auto network_session = sessions_->GetSessionFromAddress(from);
@@ -160,13 +159,14 @@ void CefPlugin::OnPacketReceived(const asio::ip::udp::endpoint& from, const char
 			std::lock_guard<std::mutex> lock(network_session->kcp_mutex);
 			ikcp_input(network_session->kcp_instance, data, len);
 		}
+
 		HandleKcpInput(network_session);
 		return;
 	}
 
 	NetworkPacket packet;
-	if (!DeserializePacket(data, len, packet))
-		return;
+    if (!DeserializePacket(data, len, packet))
+        return;
 
 	switch (packet.type)
 	{
@@ -178,6 +178,8 @@ void CefPlugin::OnPacketReceived(const asio::ip::udp::endpoint& from, const char
 			if (network_session && network_session->handshake_status == HandshakeStatus::CHALLENGED) {
 				HandleHandshakeFinalize(from, std::get<HandshakeFinalizePacket>(packet.payload), network_session);
 			}
+
+            break;
 		default:
 			break;
 	}
@@ -185,11 +187,18 @@ void CefPlugin::OnPacketReceived(const asio::ip::udp::endpoint& from, const char
 
 void CefPlugin::HandleRequestJoin(const asio::ip::udp::endpoint& from, const RequestJoinPacket& join_packet)
 {
-	int playerid = join_packet.playerid;
+    int playerid = join_packet.playerid;
 
-	std::string official_ip = bridge_->GetPlayerIp(playerid);
-	if (!official_ip.empty() && official_ip != from.address().to_string())
-		return;
+    std::string from_ip = from.address().to_string();
+    std::string official_ip = bridge_->GetPlayerIp(playerid);
+
+    LOG_INFO("[CEF] RequestJoin pid=%d from=%s:%d official=%s", playerid, from_ip.c_str(), (int)from.port(), official_ip.c_str());
+
+    if (!official_ip.empty() && official_ip != from_ip)
+    {
+        LOG_WARN("[CEF] RequestJoin dropped: IP mismatch (official=%s, from=%s)", official_ip.c_str(), from_ip.c_str());
+        return;
+    }
 
 	auto session = sessions_->GetOrCreateSession(playerid);
 	session->address = from;
@@ -288,7 +297,7 @@ void CefPlugin::HandleKcpInput(std::shared_ptr<NetworkSession> session)
                 HandleFileRequest(session->playerid, std::get<RequestFilesPacket>(packet.payload));
                 break;
             }
-            case PacketType::DownloadStarted:
+            /*case PacketType::DownloadStarted:
             {
                 const auto& download_started_packet = std::get<DownloadStartedPacket>(packet.payload);
                 resource_dialog_->StartForPlayer(session->playerid, download_started_packet.files_to_download);
@@ -300,6 +309,11 @@ void CefPlugin::HandleKcpInput(std::shared_ptr<NetworkSession> session)
                 resource_dialog_->UpdateProgress(session->playerid, download_progress_packet.file_index, download_progress_packet.bytes_received);
                 break;
             }
+            case PacketType::DownloadComplete:
+            {
+                resource_dialog_->FinishForPlayer(session->playerid);
+                break;
+            }*/
             case PacketType::ClientEmitEvent:
             {
                 if (auto* event = std::get_if<ClientEmitEventPacket>(&packet.payload)) {
@@ -363,13 +377,12 @@ void CefPlugin::ProcessFileTransfers()
             session->current_transfer = session->download_queue.front();
             session->download_queue.pop();
 
-            LOG_INFO("[Transfer] Starting transfer for player %d - file '%s'",
-                session->playerid,
-                session->current_transfer->relativePath);
+            LOG_INFO("[Transfer] Starting transfer for player %d - file '%s'", session->playerid, session->current_transfer->relativePath);
         }
 
         auto& transfer = session->current_transfer;
-        if (!transfer) continue;
+        if (!transfer) 
+            continue;
 
         int sent_this_tick = 0;
 
@@ -381,9 +394,7 @@ void CefPlugin::ProcessFileTransfers()
 
             if (transfer->currentChunkIndex >= transfer->totalChunks)
             {
-                LOG_INFO("[Transfer] Completed transfer for player %d - file '%s'",
-                    session->playerid,
-                    transfer->relativePath);
+                LOG_INFO("[Transfer] Completed transfer for player %d - file '%s'", session->playerid, transfer->relativePath);
 
                 session->current_transfer = nullptr;
                 break;
@@ -401,17 +412,16 @@ void CefPlugin::ProcessFileTransfers()
                 break;
             }
 
-
             size_t chunkOffset = transfer->currentChunkIndex * FILE_CHUNK_SIZE;
-            size_t remaining   = transfer->content.size() - chunkOffset;
-            size_t chunkSize   = std::min(static_cast<size_t>(FILE_CHUNK_SIZE), remaining);
+            size_t remaining = transfer->content.size() - chunkOffset;
+            size_t chunkSize = std::min(static_cast<size_t>(FILE_CHUNK_SIZE), remaining);
 
             FileDataPacket packet;
             packet.resourceName = transfer->resourceName;
             packet.relativePath = transfer->relativePath;
-            packet.fileHash     = transfer->fileHash;
-            packet.chunkIndex   = transfer->currentChunkIndex;
-            packet.totalChunks  = transfer->totalChunks;
+            packet.fileHash = transfer->fileHash;
+            packet.chunkIndex = transfer->currentChunkIndex;
+            packet.totalChunks = transfer->totalChunks;
             packet.data.assign(
                 transfer->content.begin() + chunkOffset,
                 transfer->content.begin() + chunkOffset + chunkSize
@@ -423,31 +433,6 @@ void CefPlugin::ProcessFileTransfers()
             ++sent_this_tick;
         }
     }
-}
-
-void CefPlugin::ScheduleFileTransferTick()
-{
-	/*transfer_timer_.expires_after(std::chrono::milliseconds(10));
-    transfer_timer_.async_wait(
-        asio::bind_executor(strand_,
-            [this](const std::error_code& ec) {
-                if (!running_) return;
-                if (!ec) {
-                    ProcessFileTransfers();
-                    // Réarmer depuis le même strand
-                    ScheduleFileTransferTick();
-                }
-            }
-        )
-    );*/
-
-	/*transfer_timer_.expires_after(std::chrono::milliseconds(10));
-	transfer_timer_.async_wait([this](const std::error_code& ec) {
-		if (!ec && running_) {
-			ProcessFileTransfers();
-			ScheduleFileTransferTick();
-		}
-	});*/
 }
 
 void CefPlugin::PauseDownload(int playerid, bool pause) 

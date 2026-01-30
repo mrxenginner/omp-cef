@@ -39,8 +39,9 @@ enum class PacketType : uint8_t
 	RequestFiles,
 	FileData,
 
-	DownloadStarted,
-	DownloadProgress,
+	//DownloadStarted,
+	//DownloadProgress,
+	//DownloadComplete,
 
 	EmitEvent,
 	EmitBrowserEvent,
@@ -91,7 +92,7 @@ struct FileDataPacket
 	std::vector<uint8_t> data;
 };
 
-struct DownloadStartedPacket 
+/*struct DownloadStartedPacket
 {
     std::vector<std::pair<std::string, size_t>> files_to_download;
 };
@@ -100,7 +101,7 @@ struct DownloadProgressPacket
 {
     uint32_t file_index;
     uint64_t bytes_received;
-};
+};*/
 
 struct EmitEventPacket 
 {
@@ -125,8 +126,8 @@ using PacketPayload = std::variant<
 	RequestFilesPacket,
 	FileDataPacket,
 
-	DownloadStartedPacket,
-	DownloadProgressPacket,
+	//DownloadStartedPacket,
+	//DownloadProgressPacket,
 
 	EmitEventPacket,
 	ClientEmitEventPacket

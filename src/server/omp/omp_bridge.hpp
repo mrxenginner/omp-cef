@@ -21,9 +21,6 @@ public:
     std::string GetPlayerIp(int playerid) override;
     void KickPlayer(int playerid) override;
 
-    void ShowDialog(int playerid, int dialogid, int style, const std::string& title, const std::string& body, const std::string& button1, const std::string& button2) override;
-    void HideDialog(int playerid) override;
-
 private:
     ICore* core_;
     IPawnComponent* pawn_;

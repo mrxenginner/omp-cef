@@ -8,10 +8,15 @@
 #include "bridge.hpp"
 #include "logger.hpp"
 #include "network.hpp"
-#include "resource_dialog.hpp"
 #include "resource_manager.hpp"
 #include "security.hpp"
 #include "session.hpp"
+
+struct CefPluginOptions
+{
+    CefLogLevel log_level = CefLogLevel::Info;
+	std::vector<uint8_t> master_resource_key = {};
+};
 
 struct RegisteredEvent
 {
@@ -27,19 +32,17 @@ public:
 	CefPlugin& operator=(const CefPlugin&) = delete;
 	~CefPlugin();
 
-	void Initialize(std::unique_ptr<IPlatformBridge> bridge, std::vector<uint8_t> master_resource_key);
+	void Initialize(std::unique_ptr<IPlatformBridge> bridge, uint16_t listen_port, const CefPluginOptions& options);
 	void Shutdown();
 
 	void OnPlayerConnect(int playerid);
 	void OnPlayerClientInit(int playerid);
 	void OnPlayerDisconnect(int playerid);
-	void OnDialogResponse(int playerid, int dialogid, int response, int listitem, const std::string& inputtext);
 
 	void OnPacketReceived(const asio::ip::udp::endpoint& from, const char* data, int len);
 
 	void HandleFileRequest(int playerid, const RequestFilesPacket& request);
 	void ProcessFileTransfers();
-	void ScheduleFileTransferTick();
 
 	void PauseDownload(int playerid, bool pause);
 
@@ -73,7 +76,6 @@ private:
 	std::unique_ptr<NetworkSessionManager> sessions_;
 	std::unique_ptr<CefApi> api_;
 	std::unique_ptr<ResourceManager> resource_;
-	std::unique_ptr<ResourceDialog> resource_dialog_;
 
 	Logger logger_;
 

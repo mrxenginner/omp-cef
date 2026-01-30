@@ -131,25 +131,3 @@ void OmpPlatformBridge::KickPlayer(int playerid)
         player->kick();
     }
 }
-
-void OmpPlatformBridge::ShowDialog(int playerid, int dialogid, int style, const std::string& title, const std::string& body, const std::string& button1, const std::string& button2)
-{
-    IPlayer* player = core_->getPlayers().get(playerid);
-    if (!player)
-        return;
-
-    const auto dialog_style = static_cast<DialogStyle>(style);
-
-    IPlayerDialogData* dialogData = queryExtension<IPlayerDialogData>(player);
-    dialogData->show(*player, dialogid, dialog_style, title, body, button1, button2);
-}
-
-void OmpPlatformBridge::HideDialog(int playerid)
-{
-    IPlayer* player = core_->getPlayers().get(playerid);
-    if (!player)
-        return;
-
-    IPlayerDialogData* dialogData = queryExtension<IPlayerDialogData>(player);
-    dialogData->hide(*player);
-}

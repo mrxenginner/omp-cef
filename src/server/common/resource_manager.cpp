@@ -1,4 +1,5 @@
 #include "resource_manager.hpp"
+#include "logger.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -7,19 +8,13 @@
 #include <shared/crypto.hpp>
 #include <shared/utils.hpp>
 #include <thread>
-
 #include <miniz.h>
-
-#include "logger.hpp"
 
 void ResourceManager::AddResource(const std::string& resourceName, const std::vector<uint8_t>& master_key)
 {
-    LOG_INFO("ResourceManager::AddResource");
-
     if (master_key.empty())
     {
-        LOG_ERROR("[ResourceManager] Cannot add resource '%s' because Master Resource Key is not set.",
-                  resourceName.c_str());
+        LOG_ERROR("[ResourceManager] Cannot add resource '%s' because Master Resource Key is not set.", resourceName.c_str());
         return;
     }
 
@@ -31,7 +26,7 @@ bool ResourceManager::GetPakContent(const std::string& resourceName, std::vector
     std::string pakPath = "scriptfiles/cef/" + resourceName + ".pak";
     if (!std::filesystem::exists(pakPath))
     {
-        LOG_ERROR("[ResourceManager] GetPakContent failed: File not found at %s", pakPath.c_str());
+        LOG_ERROR("[ResourceManager] GetPakContent failed: File not found at %s.", pakPath.c_str());
         return false;
     }
 
@@ -40,7 +35,7 @@ bool ResourceManager::GetPakContent(const std::string& resourceName, std::vector
         std::ifstream file(pakPath, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            LOG_ERROR("[ResourceManager] GetPakContent failed: Could not open file at %s", pakPath.c_str());
+            LOG_ERROR("[ResourceManager] GetPakContent failed: Could not open file at %s.", pakPath.c_str());
             return false;
         }
 
@@ -50,9 +45,7 @@ bool ResourceManager::GetPakContent(const std::string& resourceName, std::vector
         outContent.resize(static_cast<size_t>(size));
         if (file.read(reinterpret_cast<char*>(outContent.data()), size))
         {
-            LOG_DEBUG("[ResourceManager] Successfully read %lld bytes from %s.",
-                      static_cast<long long>(size),
-                      pakPath.c_str());
+            LOG_DEBUG("[ResourceManager] Successfully read %lld bytes from %s.", static_cast<long long>(size), pakPath.c_str());
             return true;
         }
     }
@@ -92,7 +85,7 @@ void ResourceManager::WriteManifest(const std::string& manifestPath, const nlohm
     }
     catch (const std::exception& e)
     {
-        LOG_ERROR("Failed to write manifest file '%s': %s", manifestPath.c_str(), e.what());
+        LOG_ERROR("[ResourceManager] Failed to write manifest file '%s': %s", manifestPath.c_str(), e.what());
     }
 }
 
@@ -109,12 +102,19 @@ nlohmann::json ResourceManager::GetManifestAsJson()
 
         for (const auto& fileInfo : resourceData.files)
         {
-            nlohmann::json fileJson = {
-                {"path", fileInfo.relativePath}, {"size", fileInfo.fileSize}, {"hash", fileInfo.fileHash}};
+            nlohmann::json fileJson = 
+            {
+                {"path", fileInfo.relativePath}, 
+                {"size", fileInfo.fileSize}, 
+                {"hash", fileInfo.fileHash}
+            };
+
             filesArray.push_back(fileJson);
         }
+
         rootJson[resourceName] = filesArray;
     }
+
     return rootJson;
 }
 
@@ -124,76 +124,75 @@ bool ResourceManager::IsFileValid(const std::string& resourceName, const std::st
 
     auto it = registered_resources_.find(resourceName);
     if (it == registered_resources_.end())
-    {
         return false;
-    }
 
     const auto& files = it->second.files;
     if (files.size() == 1 && files[0].relativePath == relativePath)
-    {
         return true;
-    }
+
     return false;
 }
 
-bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
-                                               const std::vector<uint8_t>& encryption_key)
+bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName, const std::vector<uint8_t>& encryption_key)
 {
     try
     {
         if (resourceName.find("..") != std::string::npos)
         {
-            LOG_WARN("Resource loading denied, potential path traversal in resource name: %s", resourceName.c_str());
+            LOG_WARN("[ResourceManager] Resource loading denied, potential path traversal in resource name: %s", resourceName.c_str());
             return false;
         }
 
         std::string basePath = "scriptfiles/cef/" + resourceName;
         if (!std::filesystem::is_directory(basePath))
         {
-            LOG_ERROR("Resource directory not found: %s", basePath.c_str());
+            LOG_ERROR("[ResourceManager] Resource directory not found: %s", basePath.c_str());
             return false;
         }
 
-        // std::u8string u8_basePath = std::filesystem::path(basePath).generic_u8string();
-        // std::string basePath_u8(reinterpret_cast<const char*>(u8_basePath.c_str()), u8_basePath.length());
         std::string basePath_u8 = std::filesystem::path(basePath).generic_u8string();
 
         std::string pakPath = "scriptfiles/cef/" + resourceName + ".pak";
         std::string manifestPath = pakPath + ".manifest";
         nlohmann::json manifest_data = ReadManifest(manifestPath);
         nlohmann::json new_manifest_data = nlohmann::json::object();
+
         bool needs_recompilation = false;
 
         if (manifest_data.is_null() || !std::filesystem::exists(pakPath))
         {
             needs_recompilation = true;
-            LOG_DEBUG("[Cache] No valid .pak or manifest found for '%s', forcing recompilation.", resourceName.c_str());
+            LOG_DEBUG("[ResourceManager] No valid .pak or manifest found for '%s', forcing recompilation.", resourceName.c_str());
         }
         else
         {
-            LOG_DEBUG("[Cache] Validating cache for resource '%s'...", resourceName.c_str());
+            LOG_DEBUG("[ResourceManager] Validating cache for resource '%s'...", resourceName.c_str());
         }
 
         const uint64_t MAX_FILE_SIZE = 20 * 1024 * 1024;
-        const std::set<std::string> ALLOWED_EXTENSIONS = {".html",
-                                                          ".css",
-                                                          ".js",
-                                                          ".json",
-                                                          ".xml",
-                                                          ".png",
-                                                          ".jpg",
-                                                          ".jpeg",
-                                                          ".gif",
-                                                          ".svg",
-                                                          ".ico",
-                                                          ".mp3",
-                                                          ".ogg",
-                                                          ".wav",
-                                                          ".woff",
-                                                          ".woff2",
-                                                          ".ttf",
-                                                          ".otf",
-                                                          ".eot"};
+        const std::set<std::string> ALLOWED_EXTENSIONS = 
+        {
+            ".html",
+            ".css",
+            ".js",
+            ".json",
+            ".xml",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".svg",
+            ".ico",
+            ".mp3",
+            ".ogg",
+            ".wav",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".otf",
+            ".eot"
+        };
+
         std::vector<std::pair<std::filesystem::path, std::string>> files_to_pack;
         size_t current_file_count = 0;
 
@@ -212,10 +211,6 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
 
             current_file_count++;
 
-            // std::u8string u8_full_path = entry.path().generic_u8string();
-            // std::string full_path_str(reinterpret_cast<const char*>(u8_full_path.c_str()), u8_full_path.length());
-            // std::string internalPath = full_path_str.substr(basePath_u8.length() + 1);
-
             std::string full_path_str = entry.path().generic_u8string();
             std::string internalPath = full_path_str.substr(basePath_u8.length() + 1);
 
@@ -232,7 +227,7 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
                     manifest_data[internalPath]["modified"] != last_write_time)
                 {
                     needs_recompilation = true;
-                    LOG_DEBUG("[Cache] Change detected in '%s', recompilation needed.", internalPath.c_str());
+                    LOG_DEBUG("[ResourceManager] Change detected in '%s', recompilation needed.", internalPath.c_str());
                 }
             }
         }
@@ -240,9 +235,7 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
         if (!needs_recompilation && manifest_data.size() != current_file_count)
         {
             needs_recompilation = true;
-            LOG_DEBUG("[Cache] File count mismatch (old: %zu, new: %zu), recompilation needed.",
-                      manifest_data.size(),
-                      current_file_count);
+            LOG_DEBUG("[ResourceManager] File count mismatch (old: %zu, new: %zu), recompilation needed.", manifest_data.size(), current_file_count);
         }
 
         if (!needs_recompilation)
@@ -261,7 +254,8 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
                 std::lock_guard<std::mutex> lock(resource_mutex_);
                 registered_resources_[resourceName] = pakResource;
             }
-            LOG_INFO("[Cache] Resource '%s' is up-to-date. Loaded from cache.", resourceName.c_str());
+
+            LOG_INFO("[ResourceManager] Resource '%s' is up-to-date. Loaded from cache.", resourceName.c_str());
             return true;
         }
 
@@ -270,7 +264,7 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
         mz_zip_archive zip_archive = {};
         if (mz_zip_writer_init_file(&zip_archive, pakPath.c_str(), 0) == MZ_FALSE)
         {
-            LOG_ERROR("[ResourceManager] Could not create pak file at %s", pakPath.c_str());
+            LOG_ERROR("[ResourceManager] Could not create pak file at %s.", pakPath.c_str());
             return false;
         }
 
@@ -296,11 +290,7 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
             final_data.insert(final_data.end(), iv.begin(), iv.end());
             final_data.insert(final_data.end(), encrypted_content.begin(), encrypted_content.end());
 
-            if (mz_zip_writer_add_mem(&zip_archive,
-                                      internalPath.c_str(),
-                                      reinterpret_cast<const char*>(final_data.data()),
-                                      final_data.size(),
-                                      MZ_DEFAULT_COMPRESSION) == MZ_FALSE)
+            if (mz_zip_writer_add_mem(&zip_archive, internalPath.c_str(), reinterpret_cast<const char*>(final_data.data()), final_data.size(), MZ_DEFAULT_COMPRESSION) == MZ_FALSE)
             {
                 LOG_WARN("[ResourceManager] Failed to add '%s' to pak.", internalPath.c_str());
             }
@@ -311,10 +301,12 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
 
         if (files_to_pack.empty())
         {
-            LOG_WARN("No valid files found for resource '%s'. Pak file will be empty.", resourceName.c_str());
+            LOG_WARN("[ResourceManager] No valid files found for resource '%s'. Pak file will be empty.", resourceName.c_str());
+
             std::filesystem::remove(pakPath);
             if (std::filesystem::exists(manifestPath))
                 std::filesystem::remove(manifestPath);
+
             return false;
         }
 
@@ -336,19 +328,13 @@ bool ResourceManager::ProcessResourceDirectory(const std::string& resourceName,
         }
 
         std::string formattedSize = FormatBytes(pakResource.totalSize);
-        LOG_INFO("Resource '%s' successfully packed to '%s' (%zu files, %s).",
-                 resourceName.c_str(),
-                 pakPath.c_str(),
-                 files_to_pack.size(),
-                 formattedSize.c_str());
+        LOG_INFO("[ResourceManager] Resource '%s' successfully packed to '%s' (%zu files, %s).", resourceName.c_str(), pakPath.c_str(), files_to_pack.size(), formattedSize.c_str());
 
         return true;
     }
     catch (const std::exception& e)
     {
-        LOG_ERROR("[ResourceManager] A critical error occurred while processing resource '%s': %s",
-                  resourceName.c_str(),
-                  e.what());
+        LOG_ERROR("[ResourceManager] A critical error occurred while processing resource '%s': %s", resourceName.c_str(), e.what());
         return false;
     }
 }
