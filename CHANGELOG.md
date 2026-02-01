@@ -1,4 +1,49 @@
 
+## [1.0.2](https://github.com/aurora-mp/omp-cef/compare/v1.0.1..v1.0.2) (2026-02-01)
+
+### 🧹 Chore
+
+- *(client)* Clean verbose logs - ([28a1d71](https://github.com/aurora-mp/omp-cef/commit/28a1d71a5b9f72d0ffd208a2762141d3725aace4))
+- Bump next version - ([e520280](https://github.com/aurora-mp/omp-cef/commit/e5202807efb514067e96724c40ade9b9aa0f0a8a))
+
+### ✨ Features
+
+- *(client)* Improve DevTools, removed the DevTools shortcut (it was for easy debugging) #3 - ([a488d0d](https://github.com/aurora-mp/omp-cef/commit/a488d0ddfbbefbbc52442e5c440289c6ea2e5dc7))
+- *(server)* Add new native CEF_EnableDevTools - ([6010b2d](https://github.com/aurora-mp/omp-cef/commit/6010b2daef467c3c0abd081c5453aa42e4f6879f))
+- Update for #4 - ([4d4a6dd](https://github.com/aurora-mp/omp-cef/commit/4d4a6ddafc33030a1e1ccd6a48f4de6159615c91))
+
+### 🐛 Bug Fixes
+
+- *(client)* UI browsers not rendering (OnPresent executed after Present) - ([0e9f262](https://github.com/aurora-mp/omp-cef/commit/0e9f262df8dc481ba3c09810bd2d01cee5377adb))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+
+### 🔄 Others
+
+- *(client)* Improve DevTools, removed the DevTools shortcut (it was for easy debugging) #3 - ([a488d0d](https://github.com/aurora-mp/omp-cef/commit/a488d0ddfbbefbbc52442e5c440289c6ea2e5dc7))
+- *(client)* Improve DevTools, removed the DevTools shortcut (it was for easy debugging) #3 - ([a488d0d](https://github.com/aurora-mp/omp-cef/commit/a488d0ddfbbefbbc52442e5c440289c6ea2e5dc7))
+- *(client)* Improve DevTools, removed the DevTools shortcut (it was for easy debugging) #3 - ([a488d0d](https://github.com/aurora-mp/omp-cef/commit/a488d0ddfbbefbbc52442e5c440289c6ea2e5dc7))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Fix some crashes, handle device lost/reset and avoid rendering during reset , improvements #4, #6 - ([6734002](https://github.com/aurora-mp/omp-cef/commit/6734002bd5bbb9f14870221ca5876c3904bfec4f))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+- *(client)* Improvements & make D3D9 hooking robust across setups (Direct3DCreate9 + CreateDevice) #6 - ([c05ccdf](https://github.com/aurora-mp/omp-cef/commit/c05ccdf713879601f10253d450b593348a214a33))
+
+
+
+
+
 ## [1.0.1](https://github.com/aurora-mp/omp-cef/compare/v1.0.0..v1.0.1) (2026-01-30)
 
 ### 🧹 Chore

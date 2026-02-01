@@ -187,6 +187,5 @@ PRs welcome.
 
 ## TODO
 
-- All natives implemented back
 - Some *tests* (sample gamemode, resources ... etc)
 - Wiki to explain natives/callbacks
