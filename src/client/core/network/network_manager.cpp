@@ -7,6 +7,7 @@
 #include "system/logger.hpp"
 #include "samp/samp.hpp"
 #include "samp/components/netgame.hpp"
+#include "samp/hooks/netgame.hpp"
 #include <shared/events.hpp>
 
 constexpr int CONNECT_RETRY_INTERVAL_MS = 2000;
@@ -29,6 +30,12 @@ NetworkManager::~NetworkManager()
 	Shutdown();
 }
 
+void NetworkManager::SetSessionActiveHandler(SessionActiveHandler handler)
+{
+    std::lock_guard<std::mutex> lock(session_mutex_);
+    session_handler_ = std::move(handler);
+}
+
 bool NetworkManager::Initialize(const std::string& ip, unsigned short port)
 {
 	try {
@@ -41,14 +48,17 @@ bool NetworkManager::Initialize(const std::string& ip, unsigned short port)
 		return false;
 	}
 
-	LOG_INFO("[NetworkManager] Initialized for server at {}:{}",
-		server_endpoint_.address().to_string().c_str(), server_endpoint_.port());
+	non_cef_server_.store(false);
+	FireSessionActive(false);
+
+	LOG_INFO("[NetworkManager] Initialized for server at {}:{}", server_endpoint_.address().to_string().c_str(), server_endpoint_.port());
 	return true;
 }
 
 void NetworkManager::Shutdown()
 {
 	Disconnect();
+
 	if (network_thread_.joinable()) {
 		network_thread_.join();
 	}
@@ -59,8 +69,12 @@ void NetworkManager::Connect(int playerid)
 	if (state_ != ConnectionState::DISCONNECTED)
 		return;
 
+	if (non_cef_server_.load())
+		return;
+
 	playerid_ = playerid;
 	state_ = ConnectionState::SENDING_JOIN;
+	join_attempts_ = 0;
 
 	LOG_INFO("[CLIENT] Connecting to server for playerid {}...", playerid_);
 
@@ -81,7 +95,7 @@ void NetworkManager::Connect(int playerid)
 				LOG_INFO("[CLIENT] Network thread started.");
 				io_context_.run();
 				LOG_INFO("[CLIENT] Network thread finished.");
-				});
+			});
 		}
 
 		auto keys = SecurityManager::GenerateKeys();
@@ -98,26 +112,43 @@ void NetworkManager::Connect(int playerid)
 
 void NetworkManager::Disconnect()
 {
-	if (state_ == ConnectionState::DISCONNECTED) return;
+	if (state_ == ConnectionState::DISCONNECTED) 
+		return;
+
 	LOG_INFO("[CLIENT] Disconnecting...");
+
 	state_ = ConnectionState::DISCONNECTED;
+	FireSessionActive(false);
 
 	asio::post(io_context_, [this]() {
 		connect_timer_.cancel();
 		kcp_update_timer_.cancel();
+
 		if (kcp_instance_) {
 			ikcp_release(kcp_instance_);
 			kcp_instance_ = nullptr;
 		}
+
 		if (socket_.is_open()) socket_.close();
-		});
+	});
 }
 
 void NetworkManager::DoSendRequestJoin()
 {
-	if (state_ != ConnectionState::SENDING_JOIN) return;
+	if (state_ != ConnectionState::SENDING_JOIN) 
+		return;
 
-	LOG_INFO("[CLIENT] Sending RequestJoin packet (attempt)...");
+	join_attempts_++;
+	if (join_attempts_ > MAX_JOIN_ATTEMPTS)
+	{
+		LOG_WARN("[CLIENT] No handshake after {} attempts -> assuming non-CEF server. Disconnecting.", MAX_JOIN_ATTEMPTS);
+		non_cef_server_.store(true);
+		Disconnect();
+		return;
+	}
+
+	LOG_INFO("[CLIENT] Sending RequestJoin packet (attempt {}/{})...", join_attempts_, MAX_JOIN_ATTEMPTS);
+
 	RequestJoinPacket pkt{ playerid_ };
 	SendPacket(PacketType::RequestJoin, pkt);
 
@@ -127,7 +158,7 @@ void NetworkManager::DoSendRequestJoin()
 			LOG_WARN("[CLIENT] Connection timer expired, retrying join...");
 			DoSendRequestJoin();
 		}
-		});
+	});
 }
 
 void NetworkManager::DoReceive()
@@ -155,6 +186,7 @@ void NetworkManager::HandleRawMessage(const char* data, size_t len)
 		if (input_res < 0) {
 			LOG_WARN("[KCP] ikcp_input error: {}.", input_res);
 		}
+
 		HandleKcpInput();
 		return;
 	}
@@ -164,83 +196,89 @@ void NetworkManager::HandleRawMessage(const char* data, size_t len)
 		LOG_WARN("[CLIENT] Failed to deserialize raw packet of size {}.", len);
 		return;
 	}
+
 	LOG_INFO("[CLIENT] Raw packet deserialized, type: {}", static_cast<int>(packet.type));
 
 	switch (packet.type)
 	{
-	case PacketType::HandshakeChallenge:
-	{
-		LOG_INFO("PacketType::HandshakeChallenge");
-
-		if (state_ != ConnectionState::SENDING_JOIN) return;
-
-		connect_timer_.cancel();
-		state_ = ConnectionState::AWAITING_ACCEPTANCE;
-
-		const auto& challenge = std::get<HandshakeChallengePacket>(packet.payload);
-		HandshakeFinalizePacket finalize_pkt;
-		finalize_pkt.cookie = challenge.cookie;
-		finalize_pkt.client_public_key = client_public_key_;
-
-		LOG_INFO("[CLIENT] Sending HandshakeFinalize...");
-		SendPacket(PacketType::HandshakeFinalize, finalize_pkt);
-
-		auto session_keys = SecurityManager::GenerateClientSessionKeys(
-			client_public_key_, client_private_key_, challenge.server_public_key);
-		if (session_keys.rx.empty()) { Disconnect(); return; }
-		rx_key_ = std::move(session_keys.rx);
-		tx_key_ = std::move(session_keys.tx);
-		sodium_memzero(client_private_key_.data(), client_private_key_.size());
-		break;
-	}
-	case PacketType::JoinResponse:
-	{
-		if (state_ != ConnectionState::AWAITING_ACCEPTANCE)
-			return;
-
-		const auto& response = std::get<JoinResponsePacket>(packet.payload);
-		if (!response.accepted) {
-			LOG_ERROR("[CLIENT] Join rejected by server.");
-			Disconnect();
-			return;
-		}
-
-		LOG_INFO("[CLIENT] Join accepted! Initializing KCP with conv id {}.", response.kcp_conv_id);
-
-		kcp_instance_ = ikcp_create(response.kcp_conv_id, this);
-		kcp_instance_->output = kcp_client_output_callback;
-		ikcp_nodelay(kcp_instance_, 1, 10, 2, 1);
-		ikcp_wndsize(kcp_instance_, 128, 128);
-
-		if (rx_key_.empty() || tx_key_.empty()) {
-			LOG_ERROR("[CLIENT] Session keys not initialized!");
-			Disconnect();
-			return;
-		}
-
-		auto* netGame = GetComponent<NetGameComponent>();
-		if (netGame) {
-			resource_.OnConnect(netGame->GetIp(), netGame->GetPort());
-		}
-
-		resource_.OnManifestReceived(response.manifest_json);
-
-		state_ = ConnectionState::CONNECTED;
-		DoKcpUpdate();
-
-		PacketHandler handler;
+		case PacketType::HandshakeChallenge:
 		{
-			std::lock_guard lock(handler_mutex_);
-			handler = packet_handler_;
-		}
+			LOG_INFO("PacketType::HandshakeChallenge");
 
-		if (handler)
-			handler(packet);
-		break;
-	}
-	default:
-		LOG_WARN("[CLIENT] Received unexpected raw packet of type {} during handshake.", static_cast<int>(packet.type));
-		break;
+			if (state_ != ConnectionState::SENDING_JOIN) return;
+
+			connect_timer_.cancel();
+			state_ = ConnectionState::AWAITING_ACCEPTANCE;
+
+			const auto& challenge = std::get<HandshakeChallengePacket>(packet.payload);
+			HandshakeFinalizePacket finalize_pkt;
+			finalize_pkt.cookie = challenge.cookie;
+			finalize_pkt.client_public_key = client_public_key_;
+
+			LOG_INFO("[CLIENT] Sending HandshakeFinalize...");
+			SendPacket(PacketType::HandshakeFinalize, finalize_pkt);
+
+			auto session_keys = SecurityManager::GenerateClientSessionKeys(
+				client_public_key_, client_private_key_, challenge.server_public_key);
+			if (session_keys.rx.empty()) { Disconnect(); return; }
+			rx_key_ = std::move(session_keys.rx);
+			tx_key_ = std::move(session_keys.tx);
+			sodium_memzero(client_private_key_.data(), client_private_key_.size());
+			break;
+		}
+		case PacketType::JoinResponse:
+		{
+			if (state_ != ConnectionState::AWAITING_ACCEPTANCE)
+				return;
+
+			const auto& response = std::get<JoinResponsePacket>(packet.payload);
+			if (!response.accepted) {
+				LOG_ERROR("[CLIENT] Join rejected by server.");
+				Disconnect();
+				return;
+			}
+
+			LOG_INFO("[CLIENT] Join accepted! Initializing KCP with conv id {}.", response.kcp_conv_id);
+
+			non_cef_server_.store(false);
+			FireSessionActive(true);
+
+			kcp_instance_ = ikcp_create(response.kcp_conv_id, this);
+			kcp_instance_->output = kcp_client_output_callback;
+			ikcp_nodelay(kcp_instance_, 1, 10, 2, 1);
+			ikcp_wndsize(kcp_instance_, 128, 128);
+
+			if (rx_key_.empty() || tx_key_.empty()) {
+				LOG_ERROR("[CLIENT] Session keys not initialized!");
+				Disconnect();
+				return;
+			}
+
+			auto* netGame = GetComponent<NetGameComponent>();
+			if (netGame) {
+				resource_.OnConnect(netGame->GetIp(), netGame->GetPort());
+			}
+
+			resource_.OnManifestReceived(response.manifest_json);
+
+			state_ = ConnectionState::CONNECTED;
+
+			DoKcpUpdate();
+
+			PacketHandler handler;
+			{
+				std::lock_guard lock(handler_mutex_);
+				handler = packet_handler_;
+			}
+
+			if (handler)
+				handler(packet);
+
+			break;
+		}
+		default:
+			LOG_WARN("[CLIENT] Received unexpected raw packet of type {} during handshake.", static_cast<int>(packet.type));
+			break;
 	}
 }
 
@@ -251,7 +289,7 @@ void NetworkManager::HandleKcpInput()
 
 	while ((msg_size = ikcp_recv(kcp_instance_, kcp_buffer.data(), static_cast<int>(kcp_buffer.size()))) > 0)
 	{
-		LOG_INFO("[CLIENT] Received KCP data of size {}.", msg_size);
+		LOG_DEBUG("[CLIENT] Received KCP data of size {}.", msg_size);
 		std::vector<uint8_t> decrypted = DecryptPacket({ kcp_buffer.begin(), kcp_buffer.begin() + msg_size }, rx_key_);
 		if (decrypted.empty()) {
 			LOG_WARN("[CLIENT] Failed to decrypt KCP packet.");
@@ -263,12 +301,25 @@ void NetworkManager::HandleKcpInput()
 			LOG_WARN("[CLIENT] Failed to deserialize decrypted KCP packet.");
 			continue;
 		}
-		LOG_INFO("[CLIENT] KCP packet deserialized, type: {}", static_cast<int>(packet.type));
+
+		LOG_DEBUG("[CLIENT] KCP packet deserialized, type: {}", static_cast<int>(packet.type));
 
 		PacketHandler handler;
 		{ std::lock_guard lock(handler_mutex_); handler = packet_handler_; }
 		if (handler) handler(packet);
 	}
+}
+
+void NetworkManager::FireSessionActive(bool active)
+{
+    SessionActiveHandler handler;
+    {
+        std::lock_guard<std::mutex> lock(session_mutex_);
+        handler = session_handler_;
+    }
+
+    if (handler)
+        handler(active);
 }
 
 void NetworkManager::SendPacket(PacketType type, const PacketPayload& payload)

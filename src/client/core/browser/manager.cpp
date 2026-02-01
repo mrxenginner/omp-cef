@@ -103,7 +103,7 @@ bool BrowserManager::Initialize()
     CefString(&settings.browser_subprocess_path) = (cef_dir / "renderer.exe").wstring();
 
     settings.no_sandbox = true;
-    settings.log_severity = LOGSEVERITY_DEBUG;
+    settings.log_severity = LOGSEVERITY_INFO;
     settings.multi_threaded_message_loop = true;
     settings.windowless_rendering_enabled = true;
     settings.persist_session_cookies = true;

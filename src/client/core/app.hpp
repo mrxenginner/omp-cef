@@ -55,9 +55,11 @@ public:
     void OnPacketReceived(const NetworkPacket& packet);
 
 private:
-    void FlushPendingIfReady();
-    bool ResourcesReady() const;
+    void ResetSession();
 
+    bool ResourcesReady() const;
+    void FlushPendingIfReady();
+    
     void RemovePendingCreate(int id);
     void QueueOrCreateOverlay(int id, const std::string& url, bool focused, bool controls_chat, float width, float height);
     void QueueOrCreateWorld(int id, const std::string& url, const std::string& textureName, float width, float height);

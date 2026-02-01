@@ -11,6 +11,9 @@ public:
     bool Initialize();
     void Shutdown();
 
+    void SetSessionActive(bool active);
+    bool IsSessionActive() const { return session_active_.load(); }
+
 private:
     using FnProcessGameStuff = void(__thiscall*)(void*);
     static void __fastcall Hook_ProcessGameStuff(void* pThis, void* _edx);
@@ -18,6 +21,7 @@ private:
     HookManager& hooks_;
     ResourceManager& resources_;
 
+    std::atomic<bool> session_active_{ false };
     bool cef_download_triggered_ = false;
 
     static inline NetGameHook* s_self_ = nullptr;

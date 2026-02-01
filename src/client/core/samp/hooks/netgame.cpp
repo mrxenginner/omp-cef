@@ -62,12 +62,26 @@ void NetGameHook::Shutdown()
     s_self_ = nullptr;
 }
 
+void NetGameHook::SetSessionActive(bool active)
+{
+    session_active_.store(active);
+
+    if (!active)
+        cef_download_triggered_ = false;
+}
+
 void __fastcall NetGameHook::Hook_ProcessGameStuff(void* pThis, void* /*_edx*/)
 {
     if (!s_self_ || !s_orig_)
         return;
 
     const auto state = s_self_->resources_.GetState();
+
+    if (!s_self_->session_active_.load() || state == DownloadState::IDLE)
+    {
+        s_orig_(pThis);
+        return;
+    }
 
     if (!s_self_->cef_download_triggered_ && state == DownloadState::AWAITING_TRIGGER)
     {

@@ -66,6 +66,17 @@ void App::Initialize()
     resources_.Initialize();
 }
 
+void App::ResetSession()
+{
+    // Clear pending actions
+    pending_creates_.clear();
+    pending_emits_.clear();
+    flushed_once_ = false;
+
+    // Destroy all browsers
+    browser_.DestroyAllBrowsers();
+}
+
 bool App::ResourcesReady() const
 {
     return resources_.GetState() == DownloadState::COMPLETED;
@@ -88,15 +99,15 @@ void App::FlushPendingIfReady()
         std::vector<PendingCreate> creates;
         creates.swap(pending_creates_);
 
-        for (const auto& c : creates)
+        for (const auto& crate : creates)
         {
-            if (c.kind == PendingCreate::Kind::Overlay)
+            if (crate.kind == PendingCreate::Kind::Overlay)
             {
-                browser_.CreateBrowser(c.id, c.url, c.focused, c.controls_chat, c.width, c.height);
+                browser_.CreateBrowser(crate.id, crate.url, crate.focused, crate.controls_chat, crate.width, crate.height);
             }
             else
             {
-                browser_.CreateWorldBrowser(c.id, c.url, c.textureName, c.width, c.height);
+                browser_.CreateWorldBrowser(crate.id, crate.url, crate.textureName, crate.width, crate.height);
             }
         }
     }
@@ -106,16 +117,16 @@ void App::FlushPendingIfReady()
         std::vector<PendingEmit> remaining;
         remaining.reserve(pending_emits_.size());
 
-        for (const auto& e : pending_emits_)
+        for (const auto& emit : pending_emits_)
         {
-            auto* browser = browser_.GetBrowserInstance(e.browserId);
+            auto* browser = browser_.GetBrowserInstance(emit.browserId);
             if (browser)
             {
-				SendEmitToBrowser(browser_, e.browserId, e.eventName, e.args);  
+				SendEmitToBrowser(browser_, emit.browserId, emit.eventName, emit.args);  
             }
             else
             {
-                remaining.push_back(e);
+                remaining.push_back(emit);
             }
         }
 
@@ -125,7 +136,7 @@ void App::FlushPendingIfReady()
 
 void App::Tick()
 {
-    if (network_.GetState() == ConnectionState::DISCONNECTED)
+    if (network_.GetState() == ConnectionState::DISCONNECTED && !network_.IsNonCefServer())
     {
         const auto now = ::GetTickCount64();
         const bool can_attempt_connect = (now >= next_connect_attempt_ms_);
@@ -172,6 +183,9 @@ void App::Tick()
 
                                 LOG_INFO("[CEF] Endpoint {}:{} (derived from {}:{})", net_host_.c_str(), (int)net_port_, host.c_str(), gamePort);
                             }
+
+                            LOG_INFO("[CEF] Server endpoint changed -> resetting session state.");
+                            ResetSession();
                         }
 
                         if (net_endpoint_ready_)
@@ -184,9 +198,13 @@ void App::Tick()
 
     FlushPendingIfReady();
 
-    focus_.Update();
-    browser_.RenderAll();
+    if (browser_.IsAnyBrowserVisible()) 
+    {
+        focus_.Update();
+        browser_.RenderAll();
+    }
 }
+
 
 void App::RemovePendingCreate(int id)
 {
@@ -345,6 +363,7 @@ void App::OnPacketReceived(const NetworkPacket& packet)
 
                 hud_.SetClassSelectionVisible(toggle);
             }
+
             break;
         }
         case PacketType::EmitBrowserEvent:

@@ -45,6 +45,11 @@ public:
 	void SendRaw(const char* data, int size);
 	void SendBrowserCreateResult(int browserId, bool success, int code, const std::string& reason);
 
+	bool IsNonCefServer() const { return non_cef_server_.load(); }
+
+	using SessionActiveHandler = std::function<void(bool)>;
+	void SetSessionActiveHandler(SessionActiveHandler handler);
+
 	ConnectionState GetState() const { return state_; }
 
 private:
@@ -54,6 +59,8 @@ private:
 
 	void HandleRawMessage(const char* data, size_t len);
 	void HandleKcpInput();
+
+	void FireSessionActive(bool active);
 
 private:
 	ResourceManager& resource_;
@@ -82,4 +89,12 @@ private:
 
 	PacketHandler packet_handler_;
 	std::mutex handler_mutex_;
+
+	int join_attempts_ = 0;
+	static constexpr int MAX_JOIN_ATTEMPTS = 5;
+
+	std::atomic<bool> non_cef_server_{ false };
+
+	SessionActiveHandler session_handler_;
+	std::mutex session_mutex_;
 };

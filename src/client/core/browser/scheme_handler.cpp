@@ -62,7 +62,7 @@ static std::string GetInternalLoadingHtml()
                     const elSub = document.getElementById('sub');
                     const elFile = document.getElementById('file');
                     const elSpeed = document.getElementById('speed');
-                    const elEta = document.getElementById('eta');
+                    //const elEta = document.getElementById('eta');
 
                     let total = 0, got = 0;
                     let targetPct = 0;
@@ -84,12 +84,12 @@ static std::string GetInternalLoadingHtml()
                         const sp = dGot/dt;
                         elSpeed.textContent = `${fmtBytes(sp)}/s`;
                         
-                        if(total>0 && sp>1){
+                        /*if(total>0 && sp>1){
                             const rem = Math.max(0,total-got);
                             const eta = rem/sp;
                             const m = Math.floor(eta/60), s = Math.floor(eta%60);
                             elEta.textContent = `${m}m ${s}s`;
-                        }
+                        }*/
 
                         lastT = now; lastGot = got;
                     }
@@ -124,7 +124,7 @@ static std::string GetInternalLoadingHtml()
                         targetPct = 100;
                             elFile.textContent = 'Done';
                             elSub.textContent = 'Loading ...';
-                            elEta.textContent = '—';
+                            //elEta.textContent = '—';
                         }
                     };
                 </script>
