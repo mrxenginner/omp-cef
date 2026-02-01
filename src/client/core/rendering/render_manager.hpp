@@ -2,12 +2,9 @@
 
 #include <functional>
 #include <mutex>
-
 #include <d3d9.h>
 
 class HookManager;
-
-const auto GameDirect3DCreate9 = reinterpret_cast<IDirect3D9*(CALLBACK*)(UINT)>(0x807C2B);
 
 class RenderManager
 {
@@ -45,7 +42,7 @@ public:
     static constexpr float kBaseWidth = 640.0f;
     static constexpr float kBaseHeight = 480.0f;
 
-    // Device lifecycle callbacks
+    // Device lifecycle callbacks (restaurés)
     std::function<void(IDirect3D9*, IDirect3DDevice9*, const D3DPRESENT_PARAMETERS&)> OnDeviceInitialize;
     std::function<void()> OnDeviceDestroy;
     std::function<void()> OnBeforeBeginScene;
@@ -63,7 +60,7 @@ private:
     RenderManager() = default;
     ~RenderManager() = default;
 
-    static IDirect3D9* CALLBACK Direct3DCreate9Hook(UINT sdk_version);
+    static IDirect3D9* WINAPI Direct3DCreate9Hook(UINT sdk_version);
 
     static inline RenderManager* s_self_ = nullptr;
 

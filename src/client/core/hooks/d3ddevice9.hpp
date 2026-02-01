@@ -1,33 +1,36 @@
 #pragma once
 
 #include <d3d9.h>
+#include <atomic>
 
 class IDirect3DDevice9Hook : public IDirect3DDevice9
 {
 public:
     IDirect3DDevice9Hook() = delete;
-    ~IDirect3DDevice9Hook() noexcept {
-        _orig->Release();
-    }
+    ~IDirect3DDevice9Hook() noexcept;
 
     IDirect3DDevice9Hook(const IDirect3DDevice9Hook&) = delete;
     IDirect3DDevice9Hook(IDirect3DDevice9Hook&&) = delete;
     IDirect3DDevice9Hook& operator=(const IDirect3DDevice9Hook&) = delete;
     IDirect3DDevice9Hook& operator=(IDirect3DDevice9Hook&&) = delete;
 
-    IDirect3DDevice9Hook(IDirect3DDevice9* const orig) noexcept : _orig{ orig } {
-        _orig->AddRef();
-    }
+    explicit IDirect3DDevice9Hook(IDirect3DDevice9* orig) noexcept;
 
+    // Allow rebinding the original device (useful after Reset)
+    void Rebind(IDirect3DDevice9* newOrig) noexcept;
+
+    // Critical hooks for device lifecycle
     HRESULT __stdcall Present(const RECT*, const RECT*, HWND, const RGNDATA*) override;
     HRESULT __stdcall Reset(D3DPRESENT_PARAMETERS*) override;
     HRESULT __stdcall BeginScene() override;
     HRESULT __stdcall EndScene() override;
 
+    // COM interface
     HRESULT __stdcall QueryInterface(REFIID, void**) override;
     ULONG __stdcall AddRef() override;
     ULONG __stdcall Release() override;
 
+    // D3D9 device methods
     HRESULT __stdcall TestCooperativeLevel() override;
     UINT __stdcall GetAvailableTextureMem() override;
     HRESULT __stdcall EvictManagedResources() override;
@@ -141,13 +144,16 @@ public:
     HRESULT __stdcall DeletePatch(UINT Handle) override;
     HRESULT __stdcall CreateQuery(D3DQUERYTYPE Type, IDirect3DQuery9** ppQuery) override;
 
-public:
-    void SetForceHideCursor(BOOL toggle) {
-        m_bForceHideCursor = toggle;
-    }
+    void SetForceHideCursor(BOOL toggle) noexcept { m_bForceHideCursor = toggle; }
 
 private:
-    IDirect3DDevice9* _orig = nullptr;
+    // Thread-safe access to the original device
+    IDirect3DDevice9* orig() const noexcept
+    {
+        return orig_.load(std::memory_order_acquire);
+    }
+
+    std::atomic<IDirect3DDevice9*> orig_{ nullptr };
     bool m_bForceHideCursor = false;
 };
 

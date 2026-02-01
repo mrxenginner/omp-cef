@@ -5,38 +5,56 @@
 volatile IDirect3D9*&       gGameDirect = *reinterpret_cast<volatile IDirect3D9**>(0xC97C20);
 volatile IDirect3DDevice9*& gGameDevice = *reinterpret_cast<volatile IDirect3DDevice9**>(0xC97C28);
 
-HRESULT __stdcall IDirect3D9Hook::CreateDevice(UINT adapter, D3DDEVTYPE deviceType, HWND hFocusWindow,
-    DWORD behaviorFlags, D3DPRESENT_PARAMETERS* pPresentationParameters,
+HRESULT __stdcall IDirect3D9Hook::CreateDevice(
+    UINT adapter, D3DDEVTYPE deviceType, HWND hFocusWindow, DWORD behaviorFlags,
+    D3DPRESENT_PARAMETERS* pPresentationParameters,
     IDirect3DDevice9** ppReturnedDeviceInterface)
 {
-    const HRESULT result = _orig->CreateDevice(adapter, deviceType, hFocusWindow, behaviorFlags, pPresentationParameters, ppReturnedDeviceInterface);
 
-    if (FAILED(result) || this != gGameDirect || ppReturnedDeviceInterface != &gGameDevice)
+    LOG_DEBUG("[D3D9] CreateDevice called: this={}, gGameDirect={}, ppArg={}, &gGameDevice={}.",
+        (void*)this, (void*)gGameDirect, (void*)ppReturnedDeviceInterface, (void*)&gGameDevice);
+
+    const HRESULT result = _orig->CreateDevice(adapter, deviceType, hFocusWindow,
+        behaviorFlags, pPresentationParameters, ppReturnedDeviceInterface);
+
+    if (FAILED(result) || !ppReturnedDeviceInterface || !*ppReturnedDeviceInterface)
+        return result;
+
+    auto* render_manager = &RenderManager::Instance();
+
+    if (g_pD3DDeviceHook != nullptr)
         return result;
 
     const auto hook_device = new (std::nothrow) IDirect3DDevice9Hook{ *ppReturnedDeviceInterface };
-    if (!hook_device) return result;
+    if (!hook_device)
+        return result;
 
     g_pD3DDeviceHook = hook_device;
 
-    if (RenderManager::Instance().direct_ != nullptr)
+    if (render_manager->direct_ != nullptr)
     {
-        if (RenderManager::Instance().OnDeviceDestroy)
-            RenderManager::Instance().OnDeviceDestroy();
+        if (render_manager->OnDeviceDestroy)
+            render_manager->OnDeviceDestroy();
     }
 
-    RenderManager::Instance().device_lock_.lock();
-    RenderManager::Instance().direct_ = _orig;
-    RenderManager::Instance().device_ = *ppReturnedDeviceInterface;
-    RenderManager::Instance().device_parameters_ = *pPresentationParameters;
-    RenderManager::Instance().device_lock_.unlock();
+    {
+        std::scoped_lock lock(render_manager->device_lock_);
 
-    if (RenderManager::Instance().OnDeviceInitialize)
-        RenderManager::Instance().OnDeviceInitialize(RenderManager::Instance().direct_,
-                                                     RenderManager::Instance().device_,
-                                                     RenderManager::Instance().device_parameters_);
+        render_manager->direct_ = _orig;
+        render_manager->device_ = *ppReturnedDeviceInterface;
+        render_manager->device_parameters_ = *pPresentationParameters;
+    }
+
+    if (render_manager->OnDeviceInitialize)
+        render_manager->OnDeviceInitialize(render_manager->direct_, render_manager->device_, render_manager->device_parameters_);
 
     *ppReturnedDeviceInterface = hook_device;
+
+    if (gGameDevice == render_manager->device_ || gGameDevice == nullptr)
+        gGameDevice = hook_device;
+
+    LOG_DEBUG("[D3D9] Device hooked: orig={}, hook={}.", (void*)render_manager->device_, (void*)hook_device);
+
     return result;
 }
 
