@@ -198,13 +198,12 @@ void App::Tick()
 
     FlushPendingIfReady();
 
-    if (browser_.IsAnyBrowserVisible()) 
+    if (browser_.IsAnyBrowserVisible())
     {
         focus_.Update();
         browser_.RenderAll();
     }
 }
-
 
 void App::RemovePendingCreate(int id)
 {
@@ -333,6 +332,13 @@ void App::OnPacketReceived(const NetworkPacket& packet)
                 bool muted = event.args[1].boolValue;
 
                 audio_.SetStreamMuted(browserId, muted);
+            }
+            else if (event.name == CefEvent::Server::EnableDevTools && event.args.size() >= 2)
+            {
+                int browserId = event.args[0].intValue;
+                bool enabled  = event.args[1].boolValue;
+
+                browser_.SetDevToolsEnabled(browserId, enabled);
             }
             else if (event.name == CefEvent::Server::SetAudioMode && event.args.size() >= 2)
             {

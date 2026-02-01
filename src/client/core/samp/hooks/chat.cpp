@@ -11,11 +11,11 @@ bool ChatHook::Initialize()
 {
     s_self_ = this;
 
-    const auto version = addrs_.Version();
-    auto* base = addrs_.Base();
+    auto& addrs = SampAddresses::Instance();
+    auto* base = addrs.Base();
 
     void* addrOpenChat = nullptr;
-    switch (version)
+    switch (addrs.Version())
     {
         case SampVersion::V037:
             addrOpenChat = reinterpret_cast<void*>(base + 0x657E0);

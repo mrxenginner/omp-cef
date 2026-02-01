@@ -49,9 +49,12 @@ struct BrowserInstance
     bool visible = true;
     bool controls_chat_input = true;
 
-    explicit BrowserInstance(int id) : id(id), view(id) {}
+    bool devtools_requested = false;
+    bool devtools_open = false;
+    CefRefPtr<CefClient> devtools_client;
+    CefRefPtr<CefBrowser> devtools_browser;
 
-    void OpenDevTools();
+    explicit BrowserInstance(int id) : id(id), view(id) {}
 };
 
 class BrowserManager

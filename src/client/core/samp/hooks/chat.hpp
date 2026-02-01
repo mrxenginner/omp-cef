@@ -2,13 +2,12 @@
 
 class HookManager;
 class FocusManager;
-class SampAddresses;
 
 class ChatHook
 {
 public:
-    ChatHook(HookManager& hooks, FocusManager& focus, const SampAddresses& addrs)
-        : hooks_(hooks), focus_(focus), addrs_(addrs)
+    ChatHook(HookManager& hooks, FocusManager& focus)
+        : hooks_(hooks), focus_(focus)
     {
     }
 
@@ -21,7 +20,6 @@ private:
 
     HookManager& hooks_;
     FocusManager& focus_;
-    const SampAddresses& addrs_;
 
     static inline ChatHook* s_self_ = nullptr;
     static inline FnOpenChatInput s_orig_ = nullptr;

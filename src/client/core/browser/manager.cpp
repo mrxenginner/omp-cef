@@ -52,6 +52,68 @@ static uint32_t GetCefEventFlags()
     return flags;
 }
 
+namespace
+{
+    class DevToolsClient final : public CefClient, public CefLifeSpanHandler
+    {
+    public:
+        DevToolsClient(int ownerId, BrowserManager* mgr)
+            : ownerId_(ownerId), mgr_(mgr) {}
+
+        CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
+
+        void OnAfterCreated(CefRefPtr<CefBrowser> browser) override
+        {
+            CEF_REQUIRE_UI_THREAD();
+
+            if (!mgr_)
+            {
+                if (auto h = browser->GetHost()) h->CloseBrowser(true);
+                return;
+            }
+
+            auto* inst = mgr_->GetBrowserInstance(ownerId_);
+            if (!inst)
+            {
+                if (auto h = browser->GetHost()) h->CloseBrowser(true);
+                return;
+            }
+
+            if (!inst->devtools_requested)
+            {
+                if (auto h = browser->GetHost()) h->CloseBrowser(true);
+                return;
+            }
+
+            inst->devtools_browser = browser;
+            inst->devtools_open = true;
+        }
+
+        void OnBeforeClose(CefRefPtr<CefBrowser> browser) override
+        {
+            CEF_REQUIRE_UI_THREAD();
+
+            if (!mgr_) return;
+
+            auto* inst = mgr_->GetBrowserInstance(ownerId_);
+            if (!inst) return;
+
+            if (inst->devtools_browser && inst->devtools_browser->IsSame(browser))
+            {
+                inst->devtools_browser = nullptr;
+                inst->devtools_client = nullptr;
+                inst->devtools_open = false;
+            }
+        }
+
+    private:
+        const int ownerId_;
+        BrowserManager* mgr_;
+
+        IMPLEMENT_REFCOUNTING(DevToolsClient);
+    };
+}
+
 bool BrowserManager::Initialize()
 {
     if (initialized_)
@@ -535,19 +597,32 @@ void BrowserManager::CreateWorldBrowserInternal(
 
 void BrowserManager::DestroyBrowser(int id)
 {
+    if (!CefCurrentlyOn(TID_UI))
+    {
+        CefPostTask(TID_UI, base::BindOnce(&BrowserManager::DestroyBrowser, base::Unretained(this), id));
+        return;
+    }
+
     auto it = browsers_.find(id);
     if (it == browsers_.end())
         return;
 
     auto& instance = it->second;
-    if (instance->browser && instance->browser->GetHost())
-    {
-        instance->view.SetFocused(false);
-        instance->browser->GetHost()->CloseBrowser(true);
-        instance->browser = nullptr;
-    }
 
-    worldRenderers_.erase(id);
+    if (focusedBrowserId_ == id)
+        FocusBrowser(id, false);
+
+    if (instance->browser && instance->browser->GetHost())
+        instance->browser->GetHost()->CloseDevTools();
+
+    instance->devtools_requested = false;
+
+    if (instance->devtools_browser && instance->devtools_browser->GetHost())
+        instance->devtools_browser->GetHost()->CloseBrowser(true);
+
+    instance->devtools_open = false;
+    instance->devtools_browser = nullptr;
+    instance->devtools_client = nullptr;
 
     for (auto eit = entityToBrowserId_.begin(); eit != entityToBrowserId_.end();)
     {
@@ -560,6 +635,15 @@ void BrowserManager::DestroyBrowser(int id)
         {
             ++eit;
         }
+    }
+
+    worldRenderers_.erase(id);
+
+    if (instance->browser && instance->browser->GetHost())
+    {
+        instance->view.SetFocused(false);
+        instance->browser->GetHost()->CloseBrowser(true);
+        instance->browser = nullptr;
     }
 
     browsers_.erase(it);
@@ -601,21 +685,55 @@ void BrowserManager::ReloadBrowser(int id, bool ignoreCache)
     }
 }
 
-void BrowserInstance::OpenDevTools()
+void BrowserManager::SetDevToolsEnabled(int browserId, bool enabled)
 {
-    if (!browser)
+    if (!CefCurrentlyOn(TID_UI))
     {
-        LOG_WARN("[CEF] OpenDevTools: browser is null.");
+        CefPostTask(TID_UI,
+            base::BindOnce(&BrowserManager::SetDevToolsEnabled,
+                base::Unretained(this), browserId, enabled));
         return;
     }
 
-    CefWindowInfo windowInfo;
-    windowInfo.SetAsPopup(nullptr, "DevTools");
+    auto* inst = GetBrowserInstance(browserId);
+    if (!inst || !inst->browser)
+        return;
 
-    CefBrowserSettings settings;
-    browser->GetHost()->ShowDevTools(windowInfo, client, settings, CefPoint());
+    auto host = inst->browser->GetHost();
+    if (!host)
+        return;
 
-    LOG_DEBUG("[CEF] DevTools opened for browser ID: %d", id);
+    inst->devtools_requested = enabled;
+
+    if (enabled)
+    {
+        if (inst->devtools_open)
+            return;
+
+        if (!inst->devtools_client)
+            inst->devtools_client = new DevToolsClient(browserId, this);
+
+        CefWindowInfo windowInfo;
+        windowInfo.SetAsPopup(nullptr, "DevTools");
+
+        CefBrowserSettings settings;
+        host->ShowDevTools(windowInfo, inst->devtools_client, settings, CefPoint());
+
+        LOG_INFO("[CEF] DevTools enabled for browser {}", browserId);
+    }
+    else
+    {
+        host->CloseDevTools();
+
+        if (inst->devtools_browser && inst->devtools_browser->GetHost())
+            inst->devtools_browser->GetHost()->CloseBrowser(true);
+
+        inst->devtools_open = false;
+        inst->devtools_browser = nullptr;
+        inst->devtools_client = nullptr;
+
+        LOG_INFO("[CEF] DevTools disabled for browser {}", browserId);
+    }
 }
 
 void BrowserManager::AttachBrowserToObject(int browserId, int objectId)
@@ -738,6 +856,7 @@ bool BrowserManager::RenderAll()
             any_visible = true;
         }
     }
+
     return any_visible;
 }
 
@@ -927,12 +1046,6 @@ LRESULT BrowserManager::OnWndProcMessage(HWND hwnd, UINT msg, WPARAM wParam, LPA
     auto* focused_inst = GetFocusedBrowser();
     if (!focused_inst || !focused_inst->browser)
         return false;
-
-    if (msg == WM_KEYDOWN && (GetAsyncKeyState(VK_CONTROL) & 0x8000) && wParam == 'L')
-    {
-        focused_inst->OpenDevTools();
-        return true;
-    }
 
     auto host = focused_inst->browser->GetHost();
     if (!host)
