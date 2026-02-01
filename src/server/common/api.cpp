@@ -111,6 +111,19 @@ void CefApi::FocusBrowser(int playerid, int browserid, bool focused)
 	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
 }
 
+void CefApi::EnableDevTools(int playerid, int browserid, bool enabled)
+{
+	LOG_DEBUG("EnableDevTools: playerid=%d, browserid=%d, enabled=%d", playerid, browserid, enabled);
+
+	EmitEventPacket event;
+
+	event.name = CefEvent::Server::EnableDevTools;
+	event.args.emplace_back(browserid);
+	event.args.emplace_back(enabled);
+
+	plugin_.SendPacketToPlayer(playerid, PacketType::EmitEvent, event);
+}
+
 void CefApi::AttachBrowserToObject(int playerid, int browserid, int objectId)
 {
 	EmitEventPacket event;

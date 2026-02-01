@@ -26,6 +26,7 @@ public:
     void EmitEvent(int playerid, int browserid, const std::string& name, const std::vector<Argument>& args);
     void ReloadBrowser(int playerid, int browserid, bool ignoreCache);
     void FocusBrowser(int playerid, int id, bool focused);
+    void EnableDevTools(int playerid, int browserid, bool enabled);
 
     void AttachBrowserToObject(int playerid, int browserid, int objectid);
     void DetachBrowserFromObject(int playerid, int browserid, int objectid);

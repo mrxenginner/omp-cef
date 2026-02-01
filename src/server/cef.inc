@@ -161,6 +161,15 @@ native CEF_ReloadBrowser(playerid, browserid, bool:ignore_cache = false);
 native CEF_FocusBrowser(playerid, id, bool:focused);
 
 /**
+ * Enables or disables Chromium DevTools for a specific browser of a player.
+ *
+ * @param playerid  The ID of the player.
+ * @param browserid The ID of the target browser.
+ * @param enabled   true to show DevTools, false to hide.
+ */
+native CEF_EnableDevTools(playerid, browserid, bool:enabled);
+
+/**
  * Attaches a world browser to a specific object for a specific player.
  *
  * @param playerid          The ID of the player.
@@ -296,4 +305,4 @@ forward OnCefBrowserCreated(playerid, browserid, bool:success, E_CEF_CREATE_STAT
  * @param entity_type   The type of the entity clicked (TODO: define enum).
  * @param network_id    The network ID of the entity.
  */
-forward OnCefEntityClicked(playerid, entity_type, network_id);
+// TODO: forward OnCefEntityClicked(playerid, entity_type, network_id);

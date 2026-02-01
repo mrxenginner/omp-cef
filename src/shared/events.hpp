@@ -11,6 +11,8 @@ namespace CefEvent
         inline constexpr const char* ReloadBrowser = "ReloadBrowser";
         inline constexpr const char* FocusBrowser = "FocusBrowser";
 
+        inline constexpr const char* EnableDevTools = "EnableDevTools";
+
         inline constexpr const char* AttachBrowserToObject = "AttachBrowserToObject";
         inline constexpr const char* DetachBrowserFromObject = "DetachBrowserFromObject";
 
