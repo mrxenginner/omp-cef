@@ -58,6 +58,9 @@ void AudioManager::Shutdown()
 
 void AudioManager::OnPcmPacket(int browserId, const float** data, int frames, int channels, int sampleRate)
 {
+    if (!device_ || !context_)
+        return;
+
     if (terminate_ || frames == 0)
         return;
 

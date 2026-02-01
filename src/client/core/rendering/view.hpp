@@ -38,6 +38,9 @@ public:
         return wrapper_ ? wrapper_->GetD3DTexture() : nullptr;
     }
 
+    void OnDeviceLost();
+    void OnDeviceReset(LPDIRECT3DDEVICE9 device);
+
 private:
     void InternalCreateTexture(int width, int height);
 

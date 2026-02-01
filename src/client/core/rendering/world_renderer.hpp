@@ -25,6 +25,9 @@ public:
     int GetHeight() const { return height_; }
     IDirect3DTexture9* GetD3DTexture() const;
 
+    void OnDeviceLost();
+    void OnDeviceReset(LPDIRECT3DDEVICE9 device);
+
 private:
     void ReplaceTexturesInAtomic(RpAtomic* atomic);
     static RpAtomic* AtomicTextureSwapCallback(RpAtomic* atomic, void* userData);

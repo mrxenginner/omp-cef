@@ -26,6 +26,9 @@ public:
     LPDIRECT3DTEXTURE9 GetD3DTexture() const { return texture_; }
     RwTexture* GetRwTexture() { return rwTexture_; }
 
+    void OnDeviceLost();
+    void OnDeviceReset(LPDIRECT3DDEVICE9 device);
+
 private:
     void ReleaseResources();
 
@@ -36,4 +39,6 @@ private:
 
     RwTexture* rwTexture_ = nullptr;
     RwRaster* rwRaster_ = nullptr;
+
+    bool isLost_ = false;
 };

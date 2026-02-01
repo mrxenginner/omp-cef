@@ -52,7 +52,6 @@ struct BrowserInstance
     explicit BrowserInstance(int id) : id(id), view(id) {}
 
     void OpenDevTools();
-    void Emit(int browserId, const std::string& eventName, const std::vector<Argument>& args);
 };
 
 class BrowserManager
@@ -69,9 +68,9 @@ public:
     BrowserManager(BrowserManager&&) = delete;
     BrowserManager& operator=(BrowserManager&&) = delete;
 
-    void SetFocusManager(FocusManager* f)
+    void SetFocusManager(FocusManager* focus)
     {
-        focus_ = f;
+        focus_ = focus;
     }
 
     void SetEntityResolver(std::function<CEntity*(int)> resolver)
@@ -86,7 +85,9 @@ public:
     void CreateBrowser(int id, const std::string& url, bool focused, bool controls_chat, float width, float height);
     void CreateWorldBrowser(int id, const std::string& url, const std::string& textureName, float width, float height);
     void DestroyBrowser(int id);
+    void DestroyAllBrowsers();
     void ReloadBrowser(int id, bool ignoreCache);
+    void SetDevToolsEnabled(int browserId, bool enabled);
 
     // 3D World interaction
     void AttachBrowserToObject(int browserId, int objectId);
@@ -126,6 +127,9 @@ public:
         cursor_type_ = type;
     }
 
+    void OnDeviceLost();
+    void OnDeviceReset(IDirect3DDevice9* device);
+
 private:
     void CreateBrowserInternal(
         int id, const std::string& url, bool focused, bool controls_chat, float width, float height);
@@ -133,11 +137,10 @@ private:
     CEntity* GetEntityFromObjectId(int objectId);
 
 private:
-    
-
     bool initialized_ = false;
     DWORD uiThreadId_ = 0;
     std::atomic<bool> is_shutting_down_{false};
+    std::atomic<bool> isCefUpdatesPaused_{ false };
 
     // The single source for which browser has focus. -1 means none.
     int focusedBrowserId_ = -1;

@@ -14,7 +14,8 @@ void View::Initialize(LPDIRECT3DDEVICE9 device)
 
 void View::InternalCreateTexture(int width, int height)
 {
-    if (!device_) {
+    if (!device_) 
+    {
         LOG_ERROR("[View] D3D device is not initialized");
         return;
     }
@@ -32,16 +33,22 @@ void View::Create(int width, int height)
 
 void View::Resize(int width, int height)
 {
-    if (!active_) return;
-    if (width == width_ && height == height_ && wrapper_) return;
+    if (!active_) 
+        return;
+
+    if (width == width_ && height == height_ && wrapper_) 
+        return;
+
     InternalCreateTexture(std::max(1, width), std::max(1, height));
 }
 
 void View::UpdateTexture(const uint8_t* data, const cef_rect_t* dirtyRects, size_t count)
 {
-    if (!wrapper_ || !data) return;
+    if (!wrapper_ || !data) 
+        return;
 
-    if (count == 0 || !dirtyRects) {
+    if (count == 0 || !dirtyRects) 
+    {
         LOG_DEBUG("[View] No dirty rects provided, performing full update");
         wrapper_->Update(data, width_, height_);
         return;
@@ -50,20 +57,26 @@ void View::UpdateTexture(const uint8_t* data, const cef_rect_t* dirtyRects, size
     for (size_t i = 0; i < count; ++i)
     {
         const auto& r = dirtyRects[i];
-        if (r.width <= 0 || r.height <= 0) continue;
+        if (r.width <= 0 || r.height <= 0) 
+            continue;
+
         wrapper_->UpdatePartial(data, width_, height_, r.x, r.y, r.width, r.height);
     }
 }
 
 void View::OnPaint(const void* buffer, int width, int height)
 {
-    if (!wrapper_ || !buffer) return;
+    if (!wrapper_ || !buffer) 
+        return;
+
     wrapper_->Update(buffer, width, height);
 }
 
 void View::Draw()
 {
-    if (!wrapper_ || !active_) return;
+    if (!wrapper_ || !active_) 
+        return;
+
     wrapper_->Draw(posX_, posY_);
 }
 
@@ -71,4 +84,21 @@ cef_rect_t View::rect() const
 {
     cef_rect_t rc{0,0, std::max(1, width_), std::max(1, height_)};
     return rc;
+}
+
+void View::OnDeviceLost()
+{
+    LOG_DEBUG("[View] OnDeviceLost for view {}", id_);
+
+    if (wrapper_) 
+        wrapper_->OnDeviceLost();
+}
+
+void View::OnDeviceReset(LPDIRECT3DDEVICE9 device)
+{
+    LOG_DEBUG("[View] OnDeviceReset for view {}", id_);
+
+    device_ = device;
+    if (wrapper_)
+        wrapper_->OnDeviceReset(device);
 }

@@ -68,21 +68,38 @@ bool BrowserManager::Initialize()
 
     auto base = std::filesystem::path(exe_path).parent_path();
     auto cef_dir = base / "cef";
-    auto cache_dir = cef_dir / "cache";
-    auto profile_dir = cache_dir / "profile";
-    auto log_file = cef_dir / "debug.log";
 
-    std::filesystem::create_directories(profile_dir);
+    // Use GTA user files (writable) for ALL CEF internal data.
+    // Keep game folder 'cef/' for binaries/resources, not for cache/profile.
+    auto user_files = std::filesystem::path(gta_.GetUserFilesPath());
+    auto user_cef_root = user_files / "cef";
+    auto user_cef_ui_cache = user_cef_root / "cache";
 
-    LOG_DEBUG("[CEF] Base dir: {}", base.string().c_str());
-    LOG_DEBUG("[CEF] CEF dir: {}", cef_dir.string().c_str());
-    LOG_DEBUG("[CEF] Cache dir: {}", cache_dir.string().c_str());
-    LOG_DEBUG("[CEF] Profile dir: {}", profile_dir.string().c_str());
-    LOG_DEBUG("[CEF] Log file: {}", log_file.string().c_str());
+    // CEF internal cache/profile
+    const auto user_cache_dir = user_cef_root / "cef_cache";
 
-    CefString(&settings.log_file) = log_file.wstring();
-    CefString(&settings.root_cache_path) = cache_dir.wstring();
-    CefString(&settings.cache_path) = profile_dir.wstring(); 
+    // CEF debug log
+    const auto cef_log_file = user_cef_root / "debug.log";
+
+    std::error_code error_code;
+    std::filesystem::create_directories(user_cef_ui_cache, error_code);
+    std::filesystem::create_directories(user_cache_dir, error_code);
+
+    LOG_DEBUG("[CEF] UserFiles: {}", user_files.string().c_str());
+    LOG_DEBUG("[CEF] UI cache: {}", user_cef_ui_cache.string().c_str());
+    LOG_DEBUG("[CEF] CEF cache: {}", user_cache_dir.string().c_str());
+    LOG_DEBUG("[CEF] CEF log: {}", cef_log_file.string().c_str());
+
+    // If we still can't create dirs, fail init cleanly
+    if (!std::filesystem::exists(user_cache_dir))
+    {
+        LOG_FATAL("[CEF] Cannot create CEF cache dir: {}", user_cache_dir.string().c_str());
+        return false;
+    }
+
+    CefString(&settings.log_file) = cef_log_file.wstring();
+    CefString(&settings.root_cache_path) = user_cache_dir.wstring();
+    CefString(&settings.cache_path) = user_cache_dir.wstring();
     CefString(&settings.browser_subprocess_path) = (cef_dir / "renderer.exe").wstring();
 
     settings.no_sandbox = true;
@@ -111,6 +128,19 @@ bool BrowserManager::Initialize()
     uiThreadId_ = GetCurrentThreadId();
 
     LOG_INFO("[CEF] Browser manager initialized on UI thread id: {}.", uiThreadId_);
+
+    // Hook the device lifecycle callbacks
+    auto& render_manager = RenderManager::Instance();
+
+    render_manager.OnBeforeReset = [this]() {
+        this->OnDeviceLost();
+    };
+    
+    render_manager.OnAfterReset = [this](IDirect3DDevice9* device, const D3DPRESENT_PARAMETERS& pp) {
+        this->OnDeviceReset(device);
+    };
+    
+    LOG_INFO("[CEF] Browser manager device lifecycle callbacks registered.");
     return true;
 }
 
@@ -536,6 +566,23 @@ void BrowserManager::DestroyBrowser(int id)
     LOG_DEBUG("[CEF] Browser ID {} destroyed and removed from map.", id);
 }
 
+void BrowserManager::DestroyAllBrowsers()
+{
+    if (!CefCurrentlyOn(TID_UI))
+    {
+        CefPostTask(TID_UI, base::BindOnce(&BrowserManager::DestroyAllBrowsers, base::Unretained(this)));
+        return;
+    }
+
+    std::vector<int> ids;
+    ids.reserve(browsers_.size());
+    for (auto& kv : browsers_)
+        ids.push_back(kv.first);
+
+    for (int id : ids)
+        DestroyBrowser(id);
+}
+
 void BrowserManager::ReloadBrowser(int id, bool ignoreCache)
 {
     if (CefCurrentlyOn(TID_UI) == false)
@@ -554,6 +601,23 @@ void BrowserManager::ReloadBrowser(int id, bool ignoreCache)
     }
 }
 
+void BrowserInstance::OpenDevTools()
+{
+    if (!browser)
+    {
+        LOG_WARN("[CEF] OpenDevTools: browser is null.");
+        return;
+    }
+
+    CefWindowInfo windowInfo;
+    windowInfo.SetAsPopup(nullptr, "DevTools");
+
+    CefBrowserSettings settings;
+    browser->GetHost()->ShowDevTools(windowInfo, client, settings, CefPoint());
+
+    LOG_DEBUG("[CEF] DevTools opened for browser ID: %d", id);
+}
+
 void BrowserManager::AttachBrowserToObject(int browserId, int objectId)
 {
     if (!browsers_.count(browserId))
@@ -567,8 +631,7 @@ void BrowserManager::AttachBrowserToObject(int browserId, int objectId)
         entityToBrowserId_[nativeEntity] = browserId;
         audio_.SetStreamMuted(browserId, false); // unmute when attached
 
-        LOG_DEBUG(
-            "[CEF] Browser {} attached to object {} (Entity: {})", browserId, objectId, (const void*)nativeEntity);
+        LOG_DEBUG("[CEF] Browser {} attached to object {} (Entity: {})", browserId, objectId, (const void*)nativeEntity);
     }
     else
     {
@@ -636,6 +699,12 @@ void BrowserManager::OnBrowserClosed(int id)
 
 void BrowserManager::OnPaint(int id, const void* buffer, int w, int h)
 {
+    if (isCefUpdatesPaused_) 
+    {
+        LOG_DEBUG("[BrowserManager] CEF update paused during device reset, skipping OnPaint for browser {}", id);
+        return;
+    }
+
     auto* instance = GetBrowserInstance(id);
     if (!instance || !buffer)
         return;
@@ -800,21 +869,57 @@ void BrowserManager::UpdateAudioSpatialization()
     }
 }
 
-void BrowserInstance::OpenDevTools()
+void BrowserManager::OnDeviceLost()
 {
-    if (!browser)
+    // Stop CEF rendering during device reset
+    // This prevents CEF from trying to update textures while they're invalid
+    isCefUpdatesPaused_ = true;
+    
+    // Release all browser View resources (2D overlays)
+    for (auto& [id, instance] : browsers_) 
     {
-        LOG_WARN("[CEF] OpenDevTools: browser is null.");
-        return;
+        if (instance) 
+        {
+            LOG_DEBUG("[BrowserManager] Releasing browser {} View resources", id);
+            instance->view.OnDeviceLost();
+        }
     }
+    
+    // Release all WorldRenderer resources (3D world browsers)
+    for (auto& [browserId, renderer] : worldRenderers_) 
+    {
+        if (renderer)
+        {
+            LOG_DEBUG("[BrowserManager] Releasing WorldRenderer for browser {} resources", browserId);
+            renderer->OnDeviceLost();
+        }
+    }
+}
 
-    CefWindowInfo windowInfo;
-    windowInfo.SetAsPopup(nullptr, "DevTools");
-
-    CefBrowserSettings settings;
-    browser->GetHost()->ShowDevTools(windowInfo, client, settings, CefPoint());
-
-    LOG_DEBUG("[CEF] DevTools opened for browser ID: %d", id);
+void BrowserManager::OnDeviceReset(IDirect3DDevice9* device)
+{
+    // Recreate all browser View resources (2D overlays)
+    for (auto& [id, instance] : browsers_) 
+    {
+        if (instance) 
+        {
+            LOG_DEBUG("[BrowserManager] Recreating browser {} View resources", id);
+            instance->view.OnDeviceReset(device);
+        }
+    }
+    
+    // Recreate all WorldRenderer resources (3D world browsers)
+    for (auto& [browserId, renderer] : worldRenderers_) 
+    {
+        if (renderer) 
+        {
+            LOG_DEBUG("[BrowserManager] Recreating WorldRenderer for browser {} resources", browserId);
+            renderer->OnDeviceReset(device);
+        }
+    }
+    
+    // Resume CEF updates
+    isCefUpdatesPaused_ = false;
 }
 
 LRESULT BrowserManager::OnWndProcMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -831,9 +936,7 @@ LRESULT BrowserManager::OnWndProcMessage(HWND hwnd, UINT msg, WPARAM wParam, LPA
 
     auto host = focused_inst->browser->GetHost();
     if (!host)
-    {
         return false;
-    }
 
     switch (msg)
     {
