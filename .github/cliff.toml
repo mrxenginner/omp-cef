@@ -94,8 +94,6 @@ commit_parsers = [
   { message = "^build", group = "📦 Build"},
   { message = "^ci", group = "<!-- 4 -->🤖 CI"},
   { message = "^chore", group = "<!-- 0 -->🧹 Chore"},
-  # Les commits qui ne correspondent à aucun groupe iront dans "Autres"
-  { body = ".*", group = "🔄 Others", default = true},
 ]
 # Prevent commits that are breaking from being excluded by commit parsers.
 protect_breaking_commits = false
