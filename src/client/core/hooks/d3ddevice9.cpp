@@ -25,23 +25,26 @@ void IDirect3DDevice9Hook::Rebind(IDirect3DDevice9* newOrig) noexcept
     orig_.store(newOrig, std::memory_order_release);
 }
 
-HRESULT __stdcall IDirect3DDevice9Hook::Present(const RECT* pSourceRect, const RECT* pDestRect, 
-                                                 HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
+HRESULT __stdcall IDirect3DDevice9Hook::Present(
+    const RECT* pSourceRect, const RECT* pDestRect,
+    HWND hDestWindowOverride, const RGNDATA* pDirtyRegion)
 {
     IDirect3DDevice9* device = orig();
-    if (!device) 
+    if (!device)
         return D3DERR_INVALIDCALL;
 
-    HRESULT hr = device->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
-
     auto& render_manager = RenderManager::Instance();
-    if (SUCCEEDED(hr) && !render_manager.reset_status_)
+    if (!render_manager.reset_status_)
     {
-        if (render_manager.OnPresent) 
-            render_manager.OnPresent();
+        const HRESULT coop = device->TestCooperativeLevel();
+        if (coop == D3D_OK)
+        {
+            if (render_manager.OnPresent)
+                render_manager.OnPresent();
+        }
     }
 
-    return hr;
+    return device->Present(pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
 }
 
 HRESULT __stdcall IDirect3DDevice9Hook::Reset(D3DPRESENT_PARAMETERS* pPresentationParameters)
