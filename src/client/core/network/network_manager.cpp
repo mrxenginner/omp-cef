@@ -168,7 +168,6 @@ void NetworkManager::DoReceive()
 		[this](std::error_code ec, std::size_t bytes_recvd) {
 			if (!ec && bytes_recvd > 0) {
 				if (remote_endpoint_ == server_endpoint_) {
-					LOG_INFO("[CLIENT] Received {} bytes from server.", bytes_recvd);
 					HandleRawMessage(recv_buffer_.data(), bytes_recvd);
 				}
 			}
@@ -203,9 +202,8 @@ void NetworkManager::HandleRawMessage(const char* data, size_t len)
 	{
 		case PacketType::HandshakeChallenge:
 		{
-			LOG_INFO("PacketType::HandshakeChallenge");
-
-			if (state_ != ConnectionState::SENDING_JOIN) return;
+			if (state_ != ConnectionState::SENDING_JOIN) 
+				return;
 
 			connect_timer_.cancel();
 			state_ = ConnectionState::AWAITING_ACCEPTANCE;
@@ -289,7 +287,6 @@ void NetworkManager::HandleKcpInput()
 
 	while ((msg_size = ikcp_recv(kcp_instance_, kcp_buffer.data(), static_cast<int>(kcp_buffer.size()))) > 0)
 	{
-		LOG_DEBUG("[CLIENT] Received KCP data of size {}.", msg_size);
 		std::vector<uint8_t> decrypted = DecryptPacket({ kcp_buffer.begin(), kcp_buffer.begin() + msg_size }, rx_key_);
 		if (decrypted.empty()) {
 			LOG_WARN("[CLIENT] Failed to decrypt KCP packet.");
@@ -301,8 +298,6 @@ void NetworkManager::HandleKcpInput()
 			LOG_WARN("[CLIENT] Failed to deserialize decrypted KCP packet.");
 			continue;
 		}
-
-		LOG_DEBUG("[CLIENT] KCP packet deserialized, type: {}", static_cast<int>(packet.type));
 
 		PacketHandler handler;
 		{ std::lock_guard lock(handler_mutex_); handler = packet_handler_; }
